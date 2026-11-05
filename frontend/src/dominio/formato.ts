@@ -1,0 +1,110 @@
+import type { EstadoValidacion } from './tipos';
+
+const ZONA = 'America/Guayaquil';
+
+const fFecha = new Intl.DateTimeFormat('es-EC', { timeZone: ZONA, day: '2-digit', month: 'short', year: 'numeric' });
+const fFechaHora = new Intl.DateTimeFormat('es-EC', { timeZone: ZONA, day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+const fHora = new Intl.DateTimeFormat('es-EC', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+const fDiaCorto = new Intl.DateTimeFormat('es-EC', { timeZone: ZONA, weekday: 'short', day: '2-digit' });
+const fNumero = new Intl.NumberFormat('es-EC');
+
+/** Día del calendario sin hora (columnas DATE de la API: vigencias de permisos y solicitudes). */
+const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Instante de un valor de la API. Un día 'AAAA-MM-DD' se toma al mediodía de Ecuador para que se
+ * muestre ese mismo día (como medianoche UTC aparecía el anterior). null si no es una fecha válida.
+ */
+function instante(v: string | Date): Date | null {
+  const d = typeof v === 'string' && RE_DIA.test(v) ? new Date(`${v}T12:00:00-05:00`) : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Formatea sin interrumpir la vista: una fecha vacía o inválida se muestra como «—». */
+const formatear = (f: Intl.DateTimeFormat) => (v?: string | Date | null) => {
+  const d = v ? instante(v) : null;
+  return d ? f.format(d) : '—';
+};
+
+export const fecha = formatear(fFecha);
+export const fechaHora = formatear(fFechaHora);
+export const hora = formatear(fHora);
+export const diaCorto = (isoFecha: string) => formatear(fDiaCorto)(isoFecha);
+
+/** 'AAAA-MM-DD' de una fecha de la API, con o sin hora (para los campos de fecha); '' si no lo es. */
+export const diaIso = (v?: string | null): string => (v && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : '');
+export const numero = (v?: number | null) => (v === null || v === undefined ? '—' : fNumero.format(v));
+/** Códec de video legible a partir del FOURCC que informa FFmpeg (hevc, hev1, avc1, h264…). */
+export function codecVideo(v?: string | null): string {
+  if (!v) return 'Códec desconocido';
+  if (/hevc|hev1|hvc1|h265/i.test(v)) return 'H.265';
+  if (/avc|h264/i.test(v)) return 'H.264';
+  return v.toUpperCase();
+}
+export const porcentaje = (v?: number | null, dec = 1) => (v === null || v === undefined ? '—' : `${(v * 100).toFixed(dec)} %`);
+export const colorConfianza = (v: number | null) => v === null ? 'var(--text-3)' : v >= 0.9 ? 'var(--autorizado)' : v >= 0.75 ? 'var(--no-registrado)' : 'var(--alerta)';
+
+/** "hace 3 min", "hace 2 h", o la fecha si pasó más de un día. */
+export function relativo(v?: string | Date | null): string {
+  if (!v) return '—';
+  const s = Math.round((Date.now() - new Date(v).getTime()) / 1000);
+  if (s < 10) return 'ahora';
+  if (s < 60) return `hace ${s} s`;
+  if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
+  return fechaHora(v);
+}
+
+/** Fecha local (Ecuador) en formato YYYY-MM-DD, para inputs de tipo date. */
+export function fechaIsoLocal(d = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: ZONA, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
+/** Suma `n` días a una fecha "YYYY-MM-DD" (calendario, sin zona horaria). */
+export function sumarDias(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Convierte "YYYY-MM-DD" (día local) al instante ISO de inicio o fin de ese día en Ecuador. */
+export function limiteDia(ymd: string, fin = false): string {
+  return new Date(`${ymd}T${fin ? '23:59:59.999' : '00:00:00'}-05:00`).toISOString();
+}
+
+export const ESTADOS: Record<EstadoValidacion, { etiqueta: string; corta: string; color: string }> = {
+  autorizado: { etiqueta: 'Autorizado', corta: 'Autorizado', color: 'var(--autorizado)' },
+  pendiente_revision: { etiqueta: 'Pendiente de revisión', corta: 'Pendiente', color: 'var(--pendiente)' },
+  no_reconocido: { etiqueta: 'No registrado', corta: 'No registrado', color: 'var(--no-registrado-serie)' },
+  alerta: { etiqueta: 'Alerta', corta: 'Alerta', color: 'var(--alerta)' },
+  salida_registrada: { etiqueta: 'Salida registrada', corta: 'Salida', color: 'var(--pendiente)' },
+};
+
+/** Orden fijo de las series de estado en gráficos (validado para daltonismo). */
+export const SERIES_ESTADO = [
+  { clave: 'autorizados', etiqueta: 'Autorizados', color: '#15803d' },
+  { clave: 'pendientes', etiqueta: 'Pendientes', color: '#2563eb' },
+  { clave: 'no_registrados', etiqueta: 'No registrados', color: '#d97706' },
+  { clave: 'alertas', etiqueta: 'Alertas', color: '#b91c1c' },
+] as const;
+
+export const NIVELES_ALERTA: Record<string, { etiqueta: string; clase: string }> = {
+  CRITICA: { etiqueta: 'Crítica', clase: 'solido-alerta' },
+  ALTA: { etiqueta: 'Alta', clase: 'alerta' },
+  MEDIA: { etiqueta: 'Media', clase: 'no_reconocido' },
+};
+
+export const ROLES: Record<string, string> = { Admin: 'Administrador', Guardia: 'Guardia', GestorPermisos: 'Gestor de permisos' };
+
+export const CATEGORIAS_PERMISO: Record<string, string> = {
+  FUNCIONARIO: 'Funcionario', VISITANTE: 'Visitante', PROVEEDOR: 'Proveedor', CONTRATISTA: 'Contratista', OFICIAL: 'Vehículo oficial', EMERGENCIA: 'Emergencia',
+};
+
+export function iniciales(nombre?: string | null): string {
+  return (nombre || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]!.toUpperCase()).join('');
+}
+
+/** Nombre de archivo del encabezado Content-Disposition, o el indicado. */
+export function nombreDescarga(cabecera: string | undefined, porDefecto: string): string {
+  return cabecera?.match(/filename="?([^";]+)"?/)?.[1] ?? porDefecto;
+}
