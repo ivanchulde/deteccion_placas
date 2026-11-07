@@ -75,7 +75,8 @@ export const PanelImagen: React.FC = () => {
   useEffect(() => { obtenerEstadoSistema().then(e => setUnidad(e.unidad_institucional)).catch(() => undefined); }, []);
   return (
   <div className="auth-imagen" aria-hidden="true">
-    <video src={videoLogin} autoPlay muted loop playsInline preload="metadata" disablePictureInPicture tabIndex={-1} />
+    <video className="auth-video-fondo" src={videoLogin} autoPlay muted loop playsInline preload="metadata" disablePictureInPicture tabIndex={-1} />
+    <video className="auth-video-principal" src={videoLogin} autoPlay muted loop playsInline preload="metadata" disablePictureInPicture tabIndex={-1} />
     <div className="auth-imagen-velo" />
     <div className="auth-imagen-texto">
       <div className="etiqueta" style={{ visibility: unidad ? 'visible' : 'hidden' }}><ScanLine size={14} /> {unidad ?? '·'}</div>
