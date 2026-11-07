@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link } from 'react-router-dom';
 import { Camera, Cpu, Crop, Edit3, Loader2, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { BotonPing, type EstadoPing } from '../componentes/AntenaPing';
@@ -7,7 +8,7 @@ import { useEvento, useReconexion } from '../../aplicacion/tiempoReal';
 import { useConsulta } from '../../aplicacion/hooks';
 import type { Camara, EstadoAnpr } from '../../dominio/tipos';
 import { numero, relativo } from '../../dominio/formato';
-import { Aviso, Confirmar, Interruptor, Modal, Tarjeta, Vacio } from '../componentes/ui';
+import { Confirmar, Interruptor, Modal, Tarjeta, Vacio } from '../componentes/ui';
 import { useNotificar } from '../componentes/Notificaciones';
 import { FormularioCamara, PanelDiagnostico, ResultadoDiagnostico } from '../componentes/FormularioCamara';
 import { ReproductorPrueba } from '../componentes/envivo';
@@ -74,8 +75,8 @@ const Camaras: React.FC = () => {
   return (
     <div className="pagina">
       <div className="pila">
-        <Aviso tipo="info"><b>Ping</b> comprueba la conectividad de red y el servicio RTSP de la cámara; <b>Play</b> reproduce el flujo real para confirmar que el video llega; <b>Zona de interés</b> delimita dónde el motor busca placas; todo lo que queda fuera del polígono se ignora automáticamente. Cada minuto se verifica automáticamente el flujo RTSP de las cámaras habilitadas.</Aviso>
-        {error && <Aviso tipo="error">{error}</Aviso>}
+        <AvisoFlotante tipo="info" titulo="Uso de las cámaras"><b>Ping</b> comprueba la conectividad de red y el servicio RTSP de la cámara; <b>Play</b> reproduce el flujo real para confirmar que el video llega; <b>Zona de interés</b> delimita dónde el motor busca placas; todo lo que queda fuera del polígono se ignora automáticamente. Cada minuto se verifica automáticamente el flujo RTSP de las cámaras habilitadas.</AvisoFlotante>
+        {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
         <Tarjeta titulo="Cámaras registradas" subtitulo={datos ? `${datos.length} cámaras · ${datos.filter(c => c.activa && c.estado === 'EN_LINEA').length} en línea` : undefined}
           acciones={<>
             <button className="btn btn-secondary btn-sm" onClick={probarTodas} disabled={probando !== null || !datos?.length}>

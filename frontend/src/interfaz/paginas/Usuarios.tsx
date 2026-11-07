@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link } from 'react-router-dom';
 import { Check, Copy, Dices, Edit3, Eye, EyeOff, KeyRound, Lock, LockOpen, Mail, Plus, Search, ShieldCheck, UserPlus, UserX } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
@@ -8,7 +9,7 @@ import type { UsuarioAdmin } from '../../dominio/tipos';
 import { fechaHora, iniciales, relativo, ROLES } from '../../dominio/formato';
 import { errorCorreoInstitucional, errorDe, sinErrores, validarTexto } from '../../dominio/validacion';
 import { REGLA_MOTIVO_BAJA, REGLAS_USUARIO } from '../../dominio/reglas';
-import { Aviso, Confirmar, FilasEsqueleto, Kpi, Modal, Tarjeta, Vacio } from '../componentes/ui';
+import { Confirmar, FilasEsqueleto, Kpi, Modal, Tarjeta, Vacio } from '../componentes/ui';
 import { CampoTexto } from '../componentes/campos';
 import { useNotificar } from '../componentes/Notificaciones';
 import { DESCRIPCION_ROL, ROLES_ORDEN } from '../../dominio/permisos';
@@ -141,9 +142,9 @@ const FormularioUsuario: React.FC<{
         {!usuario && <>
           <CampoPassword password={f.password} onCambiar={password => setF(x => ({ ...x, password }))} etiqueta="Contraseña inicial (opcional)" />
           <div className="completo">
-            <Aviso tipo="info">{f.password
+            <AvisoFlotante tipo="info">{f.password
               ? 'La contraseña inicial se mostrará al finalizar. Compártala con el usuario por un canal seguro.'
-              : 'Si deja este campo vacío, se enviará al usuario un enlace por correo para definir su contraseña.'}</Aviso>
+              : 'Si deja este campo vacío, se enviará al usuario un enlace por correo para definir su contraseña.'}</AvisoFlotante>
           </div>
         </>}
         <div className="campo completo">
@@ -166,8 +167,8 @@ const FormularioUsuario: React.FC<{
               <option value="activo">Activa</option><option value="inactivo">Inactiva</option>{usuario.estado === 'pendiente' && <option value="pendiente">Pendiente de verificación</option>}
             </select></div>
         )}
-        {esPropio && <div className="completo"><Aviso tipo="info">No puede cambiar su propio rol ni desactivar su cuenta.</Aviso></div>}
-        {error && <div className="completo"><Aviso tipo="error">{error}</Aviso></div>}
+        {esPropio && <div className="completo"><AvisoFlotante tipo="info">No puede cambiar su propio rol ni desactivar su cuenta.</AvisoFlotante></div>}
+        {error && <div className="completo"><AvisoFlotante tipo="error">{error}</AvisoFlotante></div>}
       </div>
     </Modal>
   );
@@ -189,7 +190,7 @@ const PasswordInicialModal: React.FC<{ email: string; password: string; onCerrar
     <Modal titulo="Contraseña inicial creada" subtitulo={email} onCerrar={onCerrar}
       pie={<button className="btn btn-navy" onClick={onCerrar}>Listo</button>}>
       <div className="pila">
-        <Aviso tipo="advertencia">Esta contraseña solo se mostrará ahora. Compártala con el usuario por un canal seguro.</Aviso>
+        <AvisoFlotante tipo="advertencia">Esta contraseña solo se mostrará ahora. Compártala con el usuario por un canal seguro.</AvisoFlotante>
         <div className="campo">
           <label htmlFor="password-inicial-creada">Contraseña inicial</label>
           <div className="fila" style={{ gap: 6 }}>
@@ -197,7 +198,7 @@ const PasswordInicialModal: React.FC<{ email: string; password: string; onCerrar
             <button className="btn btn-secondary btn-sm" onClick={() => void copiar()}><Copy size={14} /> {copiado ? 'Copiada' : 'Copiar'}</button>
           </div>
         </div>
-        {error && <Aviso tipo="error">{error}</Aviso>}
+        {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
       </div>
     </Modal>
   );
@@ -234,10 +235,10 @@ const CambioPasswordModal: React.FC<{
       </>}>
       <div className="pila">
         {guardada
-          ? <Aviso tipo="advertencia">La contraseña se cambió y las sesiones abiertas se cerraron. Compártala con el usuario por un canal seguro.</Aviso>
-          : <Aviso tipo="info">Se generó una contraseña segura. Puede regenerarla o escribir otra. Al guardar, se cerrarán las sesiones activas.</Aviso>}
+          ? <AvisoFlotante tipo="advertencia">La contraseña se cambió y las sesiones abiertas se cerraron. Compártala con el usuario por un canal seguro.</AvisoFlotante>
+          : <AvisoFlotante tipo="info">Se generó una contraseña segura. Puede regenerarla o escribir otra. Al guardar, se cerrarán las sesiones activas.</AvisoFlotante>}
         <CampoPassword password={password} onCambiar={setPassword} etiqueta="Nueva contraseña" editable={!guardada} />
-        {error && <Aviso tipo="error">{error}</Aviso>}
+        {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
       </div>
     </Modal>
   );
@@ -287,7 +288,7 @@ const Usuarios: React.FC = () => {
           <Kpi etiqueta="Correo sin verificar" valor={c.pendientes} color="var(--pendiente)" fondo="var(--pendiente-bg)" icono={<Mail size={17} />} />
           <Kpi etiqueta="Bloqueadas" valor={c.bloqueados} color="var(--alerta)" fondo="var(--alerta-bg)" icono={<Lock size={17} />} />
         </div>
-        {error && <Aviso tipo="error">{error}</Aviso>}
+        {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
         <Tarjeta titulo="Personal con acceso al sistema" subtitulo="Puede generar contraseñas iniciales o enviar enlaces para que cada persona defina la suya."
           acciones={<>
             <Link to="/auditoria?fuente=cuentas" className="btn btn-secondary btn-sm">Auditoría de cuentas</Link>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { useSearchParams } from 'react-router-dom';
 import { Download, FileStack, Plus, PowerOff, Search, ShieldCheck, Upload, UserCheck, Users } from 'lucide-react';
 import api from '../../infraestructura/api';
@@ -7,7 +8,7 @@ import { useConsulta, useDiferido } from '../../aplicacion/hooks';
 import type { RegistroLista } from '../../dominio/tipos';
 import { fecha, fechaIsoLocal, numero, relativo } from '../../dominio/formato';
 import { descargarBlob } from '../../infraestructura/descargas';
-import { Aviso, FilasEsqueleto, Kpi, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
+import { FilasEsqueleto, Kpi, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
 import { FormularioLista } from '../componentes/FormularioLista';
 import { ImportarPermisos } from '../componentes/ImportarPermisos';
 import { useNotificar } from '../componentes/Notificaciones';
@@ -91,7 +92,7 @@ const PermisosUsuarios: React.FC<{ incrustada?: boolean }> = ({ incrustada }) =>
           <button className="btn btn-navy" onClick={() => setCreando(true)}><Plus size={15} /> Nuevo permiso</button>
         </div>
       </div>
-      {error && <Aviso tipo="error" style={{ marginBottom: 16 }}>{error}</Aviso>}
+      {error && <AvisoFlotante tipo="error" style={{ marginBottom: 16 }}>{error}</AvisoFlotante>}
 
       <div className="pila">
         <div className="grid-kpi">

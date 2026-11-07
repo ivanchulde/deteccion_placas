@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Download, Edit3, FileText, Filter, History, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { Download, Edit3, FileText, Filter, History, Search, Trash2, X } from 'lucide-react';
 import api, { mensajeError, mensajeErrorDescarga } from '../../infraestructura/api';
 import { useEvento, useReconexion } from '../../aplicacion/tiempoReal';
 import { useConsulta, useRetardado } from '../../aplicacion/hooks';
@@ -9,7 +10,7 @@ import { fecha, hora, limiteDia, nombreDescarga } from '../../dominio/formato';
 import { ESTADOS_ACCESO, estadoAcceso } from '../../dominio/estadoAcceso';
 import { descargarBlob } from '../../infraestructura/descargas';
 import { normalizarPlaca } from '../../dominio/validacion';
-import { Aviso, FilasEsqueleto, InsigniaEstado, Paginacion, Tarjeta, Vacio } from '../componentes/ui';
+import { FilasEsqueleto, InsigniaEstado, Paginacion, Tarjeta, Vacio } from '../componentes/ui';
 import { filtrarEscrito } from '../componentes/campos';
 import { PlacaFoto, ValidarModal } from '../componentes/deteccion';
 import { CeldaIngreso, actualizarCampoIngreso, type CampoIngreso } from '../componentes/CeldaIngreso';
@@ -165,14 +166,11 @@ const Detecciones: React.FC = () => {
         </Tarjeta>
 
         {nuevos > 0 && (
-          <Aviso tipo="info">
-            <span className="fila" style={{ justifyContent: 'space-between', width: '100%' }}>
-              {nuevos === 1 ? 'Se cerró 1 registro.' : `Se registraron ${nuevos} registros con salida.`}
-              <button className="btn btn-sm btn-secondary" onClick={() => { olvidarAnunciados(); cambiar('pagina', ''); recargar(); }}><RefreshCw size={13} /> Mostrar</button>
-            </span>
-          </Aviso>
+          <AvisoFlotante tipo="info" titulo="Nuevos registros con salida" alClic={() => { olvidarAnunciados(); cambiar('pagina', ''); recargar(); }}>
+            {nuevos === 1 ? 'Se cerró 1 registro.' : `Se registraron ${nuevos} registros con salida.`} Pulse para mostrarlos.
+          </AvisoFlotante>
         )}
-        {error && <Aviso tipo="error">{error}</Aviso>}
+        {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
 
         <Tarjeta titulo="Registros completos con salida" subtitulo={datos ? `${datos.total.toLocaleString('es-EC')} ${datos.total === 1 ? 'registro' : 'registros'}${hayFiltros ? ' con los filtros aplicados' : ''} · Nombre, vehículo, marca, motivo e ingreso y salida válidos · Placa opcional` : undefined}
           acciones={<>

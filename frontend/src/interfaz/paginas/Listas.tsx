@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Clock, Download, Edit3, Plus, Search, ShieldAlert, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
@@ -9,7 +10,7 @@ import type { RegistroLista } from '../../dominio/tipos';
 import { fecha, fechaIsoLocal, NIVELES_ALERTA, numero } from '../../dominio/formato';
 import { descargarBlob } from '../../infraestructura/descargas';
 import { formatearPlaca } from '../../dominio/validacion';
-import { Aviso, Confirmar, FilasEsqueleto, Pestanas, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
+import { Confirmar, FilasEsqueleto, Pestanas, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
 import { FormularioLista, RUTA_API, TipoLista } from '../componentes/FormularioLista';
 import { useNotificar } from '../componentes/Notificaciones';
 import { CeldaEvidenciaLista } from '../componentes/EvidenciaLista';
@@ -106,15 +107,15 @@ const Listas: React.FC<{ tipo?: TipoLista; incrustada?: boolean; soloMios?: bool
             { valor: 'alertas', etiqueta: 'Lista negra', icono: <ShieldAlert size={15} /> },
           ]} />}
 
-        {!puedeEditar && !puedeAgregar && <Aviso tipo="info">Consulta de solo lectura. {tipo === 'autorizados'
+        {!puedeEditar && !puedeAgregar && <AvisoFlotante tipo="info" titulo="Consulta de permisos" alClic={tipo === 'autorizados' ? () => navigate('/solicitudes?seccion=solicitudes') : undefined}>Consulta de solo lectura. {tipo === 'autorizados'
           ? <>Los permisos los otorga el gestor. Puede completar una placa pendiente después de verificar a la persona. Para un nuevo permiso, <Link to="/solicitudes?seccion=solicitudes">envíe una solicitud de acceso</Link>.</>
-          : 'Las altas y cambios los realiza el administrador.'}</Aviso>}
+          : 'Las altas y cambios los realiza el administrador.'}</AvisoFlotante>}
         {/* La lista blanca muestra los permisos activos; el registro completo por usuario está en Solicitudes */}
-        {!incrustada && tipo === 'autorizados' && puede('padron:supervisar') && <Aviso tipo="info">
+        {!incrustada && tipo === 'autorizados' && puede('padron:supervisar') && <AvisoFlotante tipo="info" titulo="Permisos activos" alClic={() => navigate('/solicitudes')}>
           Aquí están los permisos activos de todos los usuarios. Para ver lo que otorgó cada gestor, incluidos los retirados,
           abra <Link to="/solicitudes">Gestión de Permisos › Permisos otorgados por todos los usuarios</Link>.
-        </Aviso>}
-        {error && <Aviso tipo="error">{error}</Aviso>}
+        </AvisoFlotante>}
+        {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
 
         <Tarjeta
           titulo={soloMios ? 'Mis permisos otorgados' : tipo === 'autorizados' ? 'Lista blanca · permisos de acceso' : 'Lista negra · placas con alerta de seguridad'}

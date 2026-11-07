@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { BellOff, BellRing, CheckCheck, Loader2, Send, Smartphone, Trash2 } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
 import { useAuth } from '../../aplicacion/AuthContext';
@@ -7,7 +8,7 @@ import { pendienteDeAtencion, useCentroNotificaciones } from '../../aplicacion/n
 import { activarPush, desactivarPush, estadoPush, EstadoPush } from '../../infraestructura/push';
 import { useConsulta } from '../../aplicacion/hooks';
 import type { Severidad } from '../../dominio/tipos';
-import { Aviso, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
+import { Segmentado, Tarjeta, Vacio } from '../componentes/ui';
 import { ConfirmarLimpieza, ETIQUETA_SEVERIDAD, ItemNotificacion } from '../componentes/CentroNotificaciones';
 import { useNotificar } from '../componentes/Notificaciones';
 
@@ -66,9 +67,9 @@ const CanalNavegador: React.FC = () => {
             </button>
           </>}
         </div>
-        <Aviso tipo="info">
+        <AvisoFlotante tipo="info">
           <Smartphone size={13} style={{ verticalAlign: -2 }} /> En el puesto de guardia, deje la sesión abierta: al cerrar sesión el equipo deja de recibir los avisos de su cuenta.
-        </Aviso>
+        </AvisoFlotante>
       </div>
     </Tarjeta>
   );

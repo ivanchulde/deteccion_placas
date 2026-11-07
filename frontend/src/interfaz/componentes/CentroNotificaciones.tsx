@@ -97,7 +97,7 @@ export const CampanaNotificaciones: React.FC = () => {
   const Icono = pendientes > 0 ? BellRing : Bell;
   const etiqueta = `${noLeidas} sin leer${pendientes ? ` · ${pendientes} pendientes de atención` : ''}`;
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} className="campana-menu">
       <button className={`btn btn-ghost btn-sm btn-icono campana${pendientes > 0 ? ' con-pendientes' : ''}`} onClick={() => {
         if (!abierto) void recargar();
         setAbierto(a => !a);

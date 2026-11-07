@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarClock, FileCheck2, Plus, ShieldCheck, UserCheck } from 'lucide-react';
 import api from '../../infraestructura/api';
@@ -8,7 +9,7 @@ import { useConsulta, useDiferido } from '../../aplicacion/hooks';
 import type { PanelAccesos as Panel } from '../../dominio/tipos';
 import { numero, relativo } from '../../dominio/formato';
 import { formatearPlaca } from '../../dominio/validacion';
-import { Aviso, Kpi, Pestanas } from '../componentes/ui';
+import { Kpi, Pestanas } from '../componentes/ui';
 import { FormularioLista } from '../componentes/FormularioLista';
 
 import { useNotificar } from '../componentes/Notificaciones';
@@ -50,7 +51,7 @@ const GestionPermisos: React.FC = () => {
         </div>
         <button className="btn btn-navy" onClick={() => setConcediendo('')}><Plus size={16} /> Entregar permiso</button>
       </div>
-      {error && <Aviso tipo="error" style={{ marginBottom: 16 }}>{error}</Aviso>}
+      {error && <AvisoFlotante tipo="error" style={{ marginBottom: 16 }}>{error}</AvisoFlotante>}
 
       <div className="pila">
         <div className="grid-kpi">

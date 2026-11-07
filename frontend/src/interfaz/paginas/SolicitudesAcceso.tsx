@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Check, Clock, Edit3, Plus, ShieldCheck, Undo2, X } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
@@ -8,7 +9,7 @@ import { useConsulta, useDiferido } from '../../aplicacion/hooks';
 import type { EstadoSolicitud, SolicitudAcceso } from '../../dominio/tipos';
 import { CATEGORIAS_PERMISO, fecha, fechaHora, relativo } from '../../dominio/formato';
 import { formatearPlaca } from '../../dominio/validacion';
-import { Aviso, Confirmar, FilasEsqueleto, Pestanas, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
+import { Confirmar, FilasEsqueleto, Pestanas, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
 import { AprobarSolicitud, FormularioSolicitud } from '../componentes/FormularioSolicitud';
 import { useNotificar } from '../componentes/Notificaciones';
 import Listas from './Listas';
@@ -61,15 +62,15 @@ const ListaSolicitudesAcceso: React.FC<{ incrustada?: boolean; onVerPadron?: () 
   return (
     <div className={incrustada ? undefined : 'pagina'}>
       <div className="pila">
-        <Aviso tipo="info">
+        <AvisoFlotante tipo="info">
           {/* El gestor de permisos solo entrega permisos: las solicitudes las envían la garita y el administrador */}
           {resuelve && !crea
             ? <>Aquí llegan las solicitudes que envían la <b>garita</b> y el <b>administrador</b>. Revise cada una y entregue el permiso con la vigencia y el horario adecuados, o recházela.</>
             : resuelve
               ? <>Revise cada solicitud y conceda un permiso con la vigencia y el horario adecuados. Por <b>separación de funciones</b>, no puede resolver las solicitudes que usted registró.</>
               : <>Sus solicitudes llegan al <b>gestor de permisos</b> como notificación. Recibirá otra notificación cuando sean resueltas.</>}
-        </Aviso>
-        {error && <Aviso tipo="error">{error}</Aviso>}
+        </AvisoFlotante>
+        {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
         <Tarjeta titulo={resuelve && !crea ? 'Solicitudes por resolver' : resuelve ? 'Solicitudes de acceso' : 'Mis solicitudes de acceso'}
           subtitulo={resuelve && !crea ? 'Pedidos de permiso de la garita: visitas, proveedores y vehículos sin permiso' : 'Ingreso de visitas, proveedores y vehículos sin permiso detectados en la garita'}
           acciones={crea ? <button className="btn btn-navy btn-sm" onClick={() => setNueva(true)}><Plus size={14} /> Nueva solicitud</button> : undefined}
@@ -190,7 +191,7 @@ const SolicitudesAcceso: React.FC<{ incrustada?: boolean; onVerPadron?: () => vo
       { valor: 'solicitudes', etiqueta: 'Mis solicitudes', icono: <Clock size={15} /> },
     ]} />
     {seccion === 'permisos' ? <>
-      <Aviso tipo="info">Aquí aparecen los permisos registrados por el gestor, incluidos los concedidos directamente. Sus solicitudes y sus respuestas están en <b>Mis solicitudes</b>.</Aviso>
+      <AvisoFlotante tipo="info">Aquí aparecen los permisos registrados por el gestor, incluidos los concedidos directamente. Sus solicitudes y sus respuestas están en <b>Mis solicitudes</b>.</AvisoFlotante>
       <Listas tipo="autorizados" incrustada />
     </> : <ListaSolicitudesAcceso incrustada />}
   </div></div>;

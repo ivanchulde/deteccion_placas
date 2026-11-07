@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Cpu, Globe, Mail, RotateCcw, Save, Server } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
 import { useConsulta } from '../../aplicacion/hooks';
@@ -6,7 +7,7 @@ import type { EstadoAnpr } from '../../dominio/tipos';
 import { fechaHora, numero } from '../../dominio/formato';
 import { type ReglaTexto, errorDe, validarEntero, validarHost, validarTexto } from '../../dominio/validacion';
 import { REGLA_PARAMETRO_TEXTO } from '../../dominio/reglas';
-import { Aviso, Cargando, Interruptor, Tarjeta } from '../componentes/ui';
+import { Cargando, Interruptor, Tarjeta } from '../componentes/ui';
 import { CampoEntero, CampoTexto } from '../componentes/campos';
 import { CorreoSaliente, type EstadoCorreo } from '../componentes/CorreoSaliente';
 import { useNotificar } from '../componentes/Notificaciones';
@@ -95,7 +96,7 @@ const Configuracion: React.FC = () => {
   };
 
   if (cargando && !datos) return <div className="pagina"><Cargando alto={300} /></div>;
-  if (!datos) return <div className="pagina"><Aviso tipo="error">{error ?? 'No se pudo cargar la configuración.'}</Aviso></div>;
+  if (!datos) return <div className="pagina"><AvisoFlotante tipo="error">{error ?? 'No se pudo cargar la configuración.'}</AvisoFlotante></div>;
   const e = datos.entorno;
   const c = correo.datos;
 
@@ -159,7 +160,7 @@ const Configuracion: React.FC = () => {
             <dt>Cuenta</dt><dd>{c?.guardado?.habilitado ? c.guardado.usuario : e.remitente_correo ?? '—'}</dd>
             {c?.guardado?.ultima_prueba && <><dt>Última prueba</dt><dd>{c.guardado.ultima_prueba.ok ? 'Enviada' : 'Fallida'} · {fechaHora(c.guardado.ultima_prueba.fecha)}</dd></>}
           </dl>
-          {c && !c.origen_vigente && <Aviso tipo="advertencia" style={{ marginTop: 12 }}>Sin SMTP los enlaces de verificación y recuperación solo se escriben en el registro del servidor. <a href="#correo-saliente">Configurarlo</a></Aviso>}
+          {c && !c.origen_vigente && <AvisoFlotante tipo="advertencia" titulo="Correo saliente sin configurar" alClic={() => document.getElementById('correo-saliente')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Sin SMTP los enlaces de verificación y recuperación solo se escriben en el registro del servidor. Pulse para configurarlo.</AvisoFlotante>}
         </Tarjeta>
         <Tarjeta titulo="Servidor" acciones={<Server size={17} color="var(--text-3)" />}>
           <dl className="definiciones">
@@ -175,7 +176,7 @@ const Configuracion: React.FC = () => {
           {grupos.filter(g => COLUMNA_IZQUIERDA.includes(g)).map(tarjetaGrupo)}
           <div id="correo-saliente">
             {c ? <CorreoSaliente estado={c} onCambio={correo.setDatos} />
-              : correo.error ? <Aviso tipo="error">{correo.error}</Aviso> : <Cargando alto={200} />}
+              : correo.error ? <AvisoFlotante tipo="error">{correo.error}</AvisoFlotante> : <Cargando alto={200} />}
           </div>
         </div>
         <div className="pila">
@@ -184,7 +185,7 @@ const Configuracion: React.FC = () => {
       </div>
 
       <div className="barra-guardar">
-        {errorGuardar && <Aviso tipo="error">{errorGuardar}</Aviso>}
+        {errorGuardar && <AvisoFlotante tipo="error">{errorGuardar}</AvisoFlotante>}
         <span className="texto-secundario">
           {cambios.length > 0 ? `${cambios.length} ${cambios.length === 1 ? 'cambio sin guardar' : 'cambios sin guardar'}` : 'Parámetros sin cambios'}
           {conErrores > 0 && <span style={{ color: 'var(--alerta)' }}> · {conErrores === 1 ? '1 valor inválido' : `${conErrores} valores inválidos`}</span>}

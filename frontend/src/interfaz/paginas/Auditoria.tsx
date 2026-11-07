@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { useSearchParams } from 'react-router-dom';
 import { Activity, Archive, Download, KeyRound, Loader2, ScanSearch, Search, UserCog, UserSearch, X } from 'lucide-react';
 import api, { mensajeError, mensajeErrorDescarga } from '../../infraestructura/api';
@@ -8,7 +9,7 @@ import { fechaHora, fechaIsoLocal, limiteDia, nombreDescarga, numero } from '../
 import { descargarBlob } from '../../infraestructura/descargas';
 import { validarEntero } from '../../dominio/validacion';
 import { LARGO_BUSQUEDA, RETENCION_AUDITORIA } from '../../dominio/reglas';
-import { Aviso, Cargando, Confirmar, FilasEsqueleto, Modal, Paginacion, Pestanas, Tarjeta, Vacio } from '../componentes/ui';
+import { Cargando, Confirmar, FilasEsqueleto, Modal, Paginacion, Pestanas, Tarjeta, Vacio } from '../componentes/ui';
 import { CampoEntero } from '../componentes/campos';
 import { useNotificar } from '../componentes/Notificaciones';
 
@@ -144,14 +145,14 @@ const DetalleRegistro: React.FC<{ fuente: Fuente; id: number; onCerrar: () => vo
   return (
     <Modal titulo={`Registro de auditoría #${id}`} subtitulo={NOMBRE_FUENTE[fuente]} onCerrar={onCerrar}
       pie={<button className="btn btn-secondary" onClick={onCerrar}>Cerrar</button>}>
-      {cargando && !datos ? <Cargando alto={140} /> : error ? <Aviso tipo="error">{error}</Aviso> : datos && (
+      {cargando && !datos ? <Cargando alto={140} /> : error ? <AvisoFlotante tipo="error">{error}</AvisoFlotante> : datos && (
         <div className="pila" style={{ gap: 14 }}>
           <dl className="definiciones">
             {Object.entries(datos).map(([campo, valor]) => (
               <React.Fragment key={campo}><dt>{ETIQUETA_CAMPO[campo] ?? campo}</dt><dd>{valorCampo(campo, valor)}</dd></React.Fragment>
             ))}
           </dl>
-          <Aviso tipo="info">Registro inmutable: no puede editarse ni eliminarse desde el sistema (ISO/IEC 27001 A.8.15).</Aviso>
+          <AvisoFlotante tipo="info">Registro inmutable: no puede editarse ni eliminarse desde el sistema (ISO/IEC 27001 A.8.15).</AvisoFlotante>
         </div>
       )}
     </Modal>
@@ -174,7 +175,6 @@ const Auditoria: React.FC = () => {
   const [exportando, setExportando] = useState(false);
   const [retencion, setRetencion] = useState(false);
   const [dias, setDias] = useState(String(RETENCION_AUDITORIA.omision));
-  const [archivado, setArchivado] = useState<{ dias: number; archivados: Archivados } | null>(null);
 
   const cambiar = (cambios: Record<string, string>) => {
     const p = new URLSearchParams(params);
@@ -211,8 +211,7 @@ const Auditoria: React.FC = () => {
     try {
       const r = await api.post('/auditoria/retencion', { dias: Number(dias) });
       const a: Archivados = { operaciones: 0, cuentas: 0, accesos: 0, ...r.data?.archivados };
-      setArchivado({ dias: Number(dias), archivados: a });
-      notificar('exito', 'Retención aplicada', `${numero(a.operaciones + a.cuentas + a.accesos)} registros trasladados al archivo.`);
+      notificar('exito', 'Retención aplicada', `${numero(a.operaciones)} operaciones, ${numero(a.cuentas)} registros de cuentas y ${numero(a.accesos)} inicios de sesión con más de ${numero(Number(dias))} días trasladados al archivo. Los registros se conservan.`);
       recargar(true);
     } catch (e) { throw new Error(mensajeError(e)); }
   };
@@ -220,22 +219,10 @@ const Auditoria: React.FC = () => {
   return (
     <div className="pagina">
       <div className="pila">
-        <Aviso tipo="info">
+        <AvisoFlotante tipo="info" titulo="Trazabilidad del sistema">
           Los registros de auditoría son de solo inserción: no existe opción para editarlos ni eliminarlos (ISO/IEC 27001 A.8.15).
           La retención los traslada al archivo sin borrarlos, y tanto la exportación como la retención quedan registradas.
-        </Aviso>
-        {archivado && (
-          <Aviso tipo="exito">
-            <span className="fila" style={{ justifyContent: 'space-between', width: '100%', flexWrap: 'nowrap', alignItems: 'flex-start' }}>
-              <span>
-                Retención aplicada: se trasladaron al archivo <b>{numero(archivado.archivados.operaciones)}</b> operaciones,{' '}
-                <b>{numero(archivado.archivados.cuentas)}</b> registros de cuentas y <b>{numero(archivado.archivados.accesos)}</b> inicios
-                de sesión con más de {numero(archivado.dias)} días. Se conservan en las tablas de archivo.
-              </span>
-              <button className="btn btn-ghost btn-sm btn-icono" onClick={() => setArchivado(null)} aria-label="Cerrar aviso"><X size={14} /></button>
-            </span>
-          </Aviso>
-        )}
+        </AvisoFlotante>
         <Pestanas<Fuente> valor={fuente} onCambiar={f => { setTexto(''); setParams({ fuente: f }, { replace: true }); }} opciones={[
           { valor: 'operaciones', etiqueta: NOMBRE_FUENTE.operaciones, icono: <Activity size={15} /> },
           { valor: 'cuentas', etiqueta: NOMBRE_FUENTE.cuentas, icono: <UserCog size={15} /> },
@@ -261,7 +248,7 @@ const Auditoria: React.FC = () => {
             {hayFiltros && <button className="btn btn-ghost" onClick={() => { setTexto(''); setParams({ fuente }, { replace: true }); }}><X size={15} /> Limpiar</button>}
           </div>
         </Tarjeta>
-        {error && <Aviso tipo="error">{error}</Aviso>}
+        {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
         <Tarjeta titulo={TITULO_FUENTE[fuente]}
           subtitulo="Seleccione un registro para ver todas sus columnas. Registro inalterable: no puede editarse ni borrarse."
           acciones={<>

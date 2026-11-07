@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { useLocation } from 'react-router-dom';
 import { CheckCircle2, Eye, EyeOff, KeyRound, Lock, Save, UserCircle } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
@@ -7,7 +8,7 @@ import { fechaHora, iniciales, ROLES } from '../../dominio/formato';
 import { passwordValida, REGLAS_PASSWORD } from '../../dominio/password';
 import { erroresTexto, sinErrores } from '../../dominio/validacion';
 import { REGLAS_USUARIO } from '../../dominio/reglas';
-import { Aviso, Tarjeta } from '../componentes/ui';
+import { Tarjeta } from '../componentes/ui';
 import { CampoTexto } from '../componentes/campos';
 import { useNotificar } from '../componentes/Notificaciones';
 import { ETIQUETA_PERMISO } from '../../dominio/permisos';
@@ -125,7 +126,7 @@ const Perfil: React.FC = () => {
                   <span className="fila" style={{ gap: 6, fontSize: 12, color: clave.confirmar && clave.confirmar === clave.nueva ? 'var(--autorizado)' : 'var(--text-3)' }}>
                     {clave.confirmar && clave.confirmar === clave.nueva ? <CheckCircle2 size={13} /> : <Lock size={13} />}Las contraseñas coinciden</span>
                 </div>
-                {errorClave && <Aviso tipo="error">{errorClave}</Aviso>}
+                {errorClave && <AvisoFlotante tipo="error">{errorClave}</AvisoFlotante>}
                 <div className="fila" style={{ justifyContent: 'flex-end' }}>
                   <button className="btn btn-primary" disabled={!claveValida || cambiando}><KeyRound size={15} /> {cambiando ? 'Actualizando…' : 'Cambiar contraseña'}</button>
                 </div>

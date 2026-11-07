@@ -17,7 +17,9 @@ export const NotificacionesProvider: React.FC<{ children: React.ReactNode }> = (
   const notificar = useCallback((tipo: Tipo, titulo: string, texto?: string, alClic?: () => void) => {
     const id = siguiente++;
     setToasts(t => [...t.slice(-3), { id, tipo, titulo, texto, alClic }]);
-    window.setTimeout(() => cerrar(id), tipo === 'error' ? 7000 : 4500);
+    const lectura = (titulo.length + (texto?.length ?? 0)) * 45;
+    const duracion = Math.min(20000, Math.max(tipo === 'error' ? 7000 : 4500, lectura));
+    window.setTimeout(() => cerrar(id), duracion);
   }, []);
   return (
     <ContextoNotificar.Provider value={notificar}>

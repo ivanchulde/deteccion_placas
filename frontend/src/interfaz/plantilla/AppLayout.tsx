@@ -184,26 +184,34 @@ const MenuUsuario: React.FC = () => {
   const navigate = useNavigate();
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const boton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!abierto) return;
     const fuera = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setAbierto(false); };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false); };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setAbierto(false); boton.current?.focus(); }
+    };
     document.addEventListener('mousedown', fuera);
     document.addEventListener('keydown', esc);
     return () => { document.removeEventListener('mousedown', fuera); document.removeEventListener('keydown', esc); };
   }, [abierto]);
   if (!user) return null;
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button className={`boton-rol${user.rol === 'Admin' ? ' admin' : ''}`} onClick={() => setAbierto(a => !a)} aria-expanded={abierto} aria-haspopup="menu"
-        title="Perfil, notificaciones y sesión">
-        <Shield size={13} /><span className="ocultar-movil">{ROLES[user.rol]}</span><ChevronDown size={13} style={{ opacity: 0.7 }} />
+    <div ref={ref} className="menu-usuario">
+      <button ref={boton} type="button" className="usuario-boton" onClick={() => setAbierto(a => !a)} aria-expanded={abierto} aria-haspopup="menu"
+        aria-controls={abierto ? 'menu-cuenta' : undefined} aria-label={`Menú de usuario de ${user.nombre}`} title={user.nombre}>
+        <span className="avatar" aria-hidden="true">{iniciales(user.nombre)}</span>
+        <span className="usuario-datos">
+          <strong>{user.nombre}</strong>
+          <span className="usuario-rol"><Shield size={12} aria-hidden="true" />{ROLES[user.rol]}</span>
+        </span>
+        <ChevronDown size={15} className="usuario-desplegar" aria-hidden="true" />
       </button>
       {abierto && (
-        <div className="menu" role="menu">
-          <div className="menu-cabecera fila" style={{ flexWrap: 'nowrap', gap: 10 }}>
-            <span className="avatar">{iniciales(user.nombre)}</span>
-            <div style={{ minWidth: 0 }}><strong>{user.nombre}</strong><span>{user.email}</span></div>
+        <div id="menu-cuenta" className="menu" role="menu" aria-label="Cuenta de usuario">
+          <div className="menu-cabecera">
+            <strong>{user.nombre}</strong><span>{user.email}</span>
+            <small>{ROLES[user.rol]}</small>
           </div>
           <button className="menu-item" role="menuitem" onClick={() => { setAbierto(false); navigate('/perfil'); }}><UserCircle size={16} /> Mi perfil</button>
           <button className="menu-item" role="menuitem" onClick={() => { setAbierto(false); navigate('/notificaciones'); }}><Bell size={16} /> Notificaciones</button>
@@ -232,7 +240,7 @@ const BarraPestanas: React.FC = () => {
 const Header: React.FC<{ onMenuMovil: () => void }> = ({ onMenuMovil }) => {
   const { pathname } = useLocation();
   const { conectado } = useTiempoReal();
-  const { puede, user } = useAuth();
+  const { puede } = useAuth();
   const item = itemDeRuta(pathname, puede);
   return (
     <header className="header">
@@ -243,15 +251,18 @@ const Header: React.FC<{ onMenuMovil: () => void }> = ({ onMenuMovil }) => {
           <h1>{item?.titulo ?? 'Inicio'}</h1>
         </div>
         <div className="header-acciones">
-          <span className={`pastilla-red ocultar-movil ${conectado ? 'en-linea' : 'sin-conexion'}`}
-            title={conectado ? 'Recibiendo eventos en tiempo real' : 'Sin conexión de tiempo real: reintentando'}>
-            {conectado ? <Wifi size={13} /> : <WifiOff size={13} />} {conectado ? 'En línea' : 'Reconectando…'}
-          </span>
-          <span className="ocultar-movil"><RelojSesion /></span>
-          <BotonTema />
-          <BotonSonido />
-          <CampanaNotificaciones />
-          {user && <span className="pastilla-usuario ocultar-movil" title={user.nombre}><span className="punto-vivo" />{user.nombre}</span>}
+          <div className="header-estado ocultar-movil">
+            <span className={`pastilla-red ${conectado ? 'en-linea' : 'sin-conexion'}`}
+              title={conectado ? 'Recibiendo eventos en tiempo real' : 'Sin conexión de tiempo real: reintentando'}>
+              {conectado ? <Wifi size={13} /> : <WifiOff size={13} />} {conectado ? 'En línea' : 'Reconectando…'}
+            </span>
+            <RelojSesion />
+          </div>
+          <div className="header-herramientas" role="group" aria-label="Herramientas del sistema">
+            <BotonTema />
+            <BotonSonido />
+            <CampanaNotificaciones />
+          </div>
           <MenuUsuario />
         </div>
       </div>

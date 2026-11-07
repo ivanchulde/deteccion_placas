@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowDownRight, ArrowUpRight, BarChart3, CarFront, Download, Edit3, ExternalLink, ImageOff, ListFilter, LogOut, Plus, Search, SlidersHorizontal, Trash2, UserRound, X } from 'lucide-react';
 import api, { mensajeError, urlMedia } from '../../infraestructura/api';
@@ -11,7 +12,7 @@ import { estadoAcceso } from '../../dominio/estadoAcceso';
 import { formatearPlaca, normalizarPlaca, validarPlaca } from '../../dominio/validacion';
 import { horasDelMovimiento } from '../../dominio/movimiento';
 import { descargarBlob } from '../../infraestructura/descargas';
-import { Aviso, FilasEsqueleto, InsigniaEstado, Paginacion, Tarjeta, Vacio } from '../componentes/ui';
+import { FilasEsqueleto, InsigniaEstado, Paginacion, Tarjeta, Vacio } from '../componentes/ui';
 import { PlacaFoto, recortePlaca, RegistroManualModal } from '../componentes/deteccion';
 import { EliminarUno, EliminarVarios } from '../componentes/EliminarDetecciones';
 import { EditarRegistroHistorial } from '../componentes/EditarRegistroHistorial';
@@ -365,7 +366,7 @@ const HistorialCompleto: React.FC = () => {
           )}
         </Tarjeta>
 
-        {error && <Aviso tipo="error">{error}</Aviso>}
+        {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
 
         <section className="indicadores" aria-label="Totales de la consulta" role="group">
           <div className="indicadores-grupo">

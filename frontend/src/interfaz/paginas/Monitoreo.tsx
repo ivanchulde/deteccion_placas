@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Bell, BellOff, Camera, ClipboardPlus, Cpu, Edit3, Film, Gauge, History, LogOut, Pause, Play, Plus, ShieldAlert, ShieldCheck, Trash2, X } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
@@ -9,7 +10,7 @@ import type { Camara, Deteccion, EstadoAnpr } from '../../dominio/tipos';
 import { codecVideo, ESTADOS, fecha, fechaHora, fechaIsoLocal, hora, limiteDia, numero, relativo } from '../../dominio/formato';
 import { formatearPlaca } from '../../dominio/validacion';
 import { ESTADOS_ACCESO, esRegistroDeSalidas, estadoAcceso, faltantesSalida, puedeRegistrarSalida } from '../../dominio/estadoAcceso';
-import { Aviso, Cargando, InsigniaEstado, InsigniaTipificacion, Paginacion, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
+import { Cargando, InsigniaEstado, InsigniaTipificacion, Paginacion, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
 import { ImagenEvidencia, PlacaFoto, RegistroManualModal, TarjetaDeteccion, ValidarModal } from '../componentes/deteccion';
 import { VisorZoom } from '../componentes/ZoomDual';
 import { type ResultadoBusqueda, SituacionPlaca } from '../componentes/SituacionPlaca';
@@ -200,27 +201,27 @@ const Monitoreo: React.FC = () => {
   return (
     <div className="pagina ancha">
       <div className="pila">
-        {cargandoAviso && <Aviso tipo="info">Abriendo el registro de la notificación…</Aviso>}
-        {errorAviso && <Aviso tipo="error">{errorAviso}</Aviso>}
-        {!cargandoAviso && !errorAviso && registroId && seleccion?.id === registroId && <Aviso tipo="info">
+        {cargandoAviso && <AvisoFlotante tipo="info">Abriendo el registro de la notificación…</AvisoFlotante>}
+        {errorAviso && <AvisoFlotante tipo="error">{errorAviso}</AvisoFlotante>}
+        {!cargandoAviso && !errorAviso && registroId && seleccion?.id === registroId && <AvisoFlotante tipo="info">
           Registro de la notificación N.º {registroId} seleccionado en Visualización de accesos. {esRegistroDeSalidas(seleccion)
             ? 'Este registro ya está completo y puede consultarse en Registro de Salidas.'
             : 'La tabla muestra los accesos sin salida o pendientes de completar; la fila se resalta si está en la página visible.'}
-        </Aviso>}
+        </AvisoFlotante>}
         <div className="grid-principal" style={{ gridTemplateColumns: 'minmax(0, 1.9fr) minmax(320px, 1fr)' }}>
           {/* ── Video y controles ── */}
           <div className="pila">
             {motor?.en_linea && analisis && !analisis.conectada && (
-              <Aviso tipo="advertencia">
+              <AvisoFlotante tipo="advertencia">
                 <b>El motor analiza {camaraActiva?.nombre ?? 'la cámara'}, pero no recibe video.</b> Revise que la cámara tenga energía y
                 red, y compruebe su enlace con <b>Ping</b> en Operación › Registro de cámaras. El motor se reconecta solo cuando la señal vuelve.
-              </Aviso>
+              </AvisoFlotante>
             )}
             {motor?.en_linea && sinCapacidad.length > 0 && (
-              <Aviso tipo="advertencia">
+              <AvisoFlotante tipo="advertencia">
                 <b>{sinCapacidad.length === 1 ? '1 cámara' : `${sinCapacidad.length} cámaras`} sin analizar:</b> {habilitadas.filter(c => sinCapacidad.includes(c.id)).map(c => c.nombre).join(', ')}.
                 {' '}Los motores ANPR en línea ya analizan su máximo ({motor.capacidad ?? 0}): agregue otro motor, aumente ANPR_MAX_CAMARAS o marque como «solo video» las que no necesite analizar.
-              </Aviso>
+              </AvisoFlotante>
             )}
             <Tarjeta sinPadding>
               <div className="fila" style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', gap: 10 }}>
@@ -306,10 +307,10 @@ const Monitoreo: React.FC = () => {
               </div>
               {vista === 'anpr' && analisis?.captura && analisis.captura.recomendaciones.length > 0 && (
                 <div style={{ padding: '0 14px 12px' }}>
-                  <Aviso tipo="info">
+                  <AvisoFlotante tipo="info">
                     <b>Ajustes sugeridos para la cámara</b> (últimas {analisis.captura.placas} placas: unos {analisis.captura.ancho_px_p50} px de ancho)
                     <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{analisis.captura.recomendaciones.map(r => <li key={r.codigo}>{r.texto}</li>)}</ul>
-                  </Aviso>
+                  </AvisoFlotante>
                 </div>
               )}
             </Tarjeta>
@@ -320,9 +321,9 @@ const Monitoreo: React.FC = () => {
           <div className="columna-feed">
             <div className="pila columna-feed-contenido">
               {pendientes.length > 0 && (
-                <Aviso tipo="info">
+                <AvisoFlotante tipo="info">
                   <b>{pendientes.length} {pendientes.length === 1 ? 'paso requiere' : 'pasos requieren'} autorización</b> en el feed. Use “Autorizar” en cada tarjeta.
-                </Aviso>
+                </AvisoFlotante>
               )}
               <Tarjeta titulo="Detecciones en tiempo real" subtitulo="Actualización instantánea, sin recargar" sinPadding className="tarjeta-feed"
                 acciones={puedeEliminarTodos && feed.length > 0 ? <button className="btn btn-danger btn-sm" onClick={() => setEliminarTodos(true)}><Trash2 size={14} /> Eliminar todos</button> : undefined}>
@@ -574,8 +575,8 @@ export const TablaIngresosRecientes: React.FC<{
         <button type="button" className="btn btn-secondary btn-sm" onClick={onRegistrar}><ClipboardPlus size={14} /> Registrar</button>
         {texto && <button type="button" className="btn btn-ghost btn-sm btn-icono" title="Quitar el filtro" aria-label="Quitar el filtro" onClick={limpiar}><X size={14} /></button>}
       </form>}>
-      {(error || vigente) && <div style={{ padding: '12px 16px 0' }}>{error ? <Aviso tipo="error">{error}</Aviso> : vigente && <SituacionPlaca r={vigente} />}</div>}
-      {listado.error && <Aviso tipo="error">{listado.error}</Aviso>}
+      {(error || vigente) && <div style={{ padding: '12px 16px 0' }}>{error ? <AvisoFlotante tipo="error">{error}</AvisoFlotante> : vigente && <SituacionPlaca r={vigente} />}</div>}
+      {listado.error && <AvisoFlotante tipo="error">{listado.error}</AvisoFlotante>}
       {listado.cargando && <Cargando />}
       {filas.length === 0 ? (
         busquedaAplicada

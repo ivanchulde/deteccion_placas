@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CarFront, Download, FileText, Printer, UserRound } from 'lucide-react';
 import api, { mensajeError, mensajeErrorDescarga } from '../../infraestructura/api';
@@ -11,7 +12,7 @@ import {
   agrupar, diaLocal, diasEntre, duracion, hallazgos, promedioSemanal, type Sujeto, type Unidad, unidadPara,
 } from '../../dominio/analisisAccesos';
 import { descargarBlob } from '../../infraestructura/descargas';
-import { Aviso, Cargando, Tarjeta, Vacio } from '../componentes/ui';
+import { Cargando, Tarjeta, Vacio } from '../componentes/ui';
 import { Informe, ResumenInforme, TablaAccesosInforme } from '../componentes/InformeImprimible';
 import { cargarAnalisis, type DatosAnalisis, GraficosAnalisis, Hallazgos, TablaFrecuentes, TablaPersonas } from '../componentes/InformeAnalitico';
 import { type ResultadoBusqueda } from '../componentes/SituacionPlaca';
@@ -150,7 +151,7 @@ const ReporteAccesos: React.FC<{ onVehiculo: (placa: string) => void; onPersona:
       {errorFormulario && <p className="error reporte-aviso" role="alert">{errorFormulario}</p>}
       {modificado && <p className="texto-secundario reporte-aviso" role="status">Cambió los filtros. Pulse «Generar reporte» para actualizar la vista previa.</p>}
     </Tarjeta>
-    {error && <Aviso tipo="error">{error}</Aviso>}
+    {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
     {!consulta ? <Tarjeta><Vacio titulo="Genere su reporte" icono={<FileText size={22} />}
       texto="Elija el período y los accesos que necesita. Pulse «Generar reporte» para ver el documento y luego imprimirlo, guardarlo en PDF o exportar sus registros." /></Tarjeta>
       : cargando ? <Cargando alto={260} /> : !error && datos && r && (
@@ -257,7 +258,7 @@ const ReporteVehiculo: React.FC<{ consulta: Consulta | null; onConsultar: (c: Co
         else onConsultar(c);
       }}
       validar={t => { const v = validarPlaca(t); return v.ok ? { ok: true, valor: v.valor.placa } : v; }} />
-    {error && <Aviso tipo="error">{error}</Aviso>}
+    {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
     {!consulta ? (
       <Tarjeta><Vacio titulo="Consulte una placa" icono={<CarFront size={22} />}
         texto="Escriba la placa (por ejemplo ABC-1234) para ver su situación en las listas, cuándo suele ingresar, cuánto permanece, quién lo ingresa y cada ingreso. Puede acotar las fechas." /></Tarjeta>
@@ -322,7 +323,7 @@ const ReportePersona: React.FC<{ consulta: Consulta | null; onConsultar: (c: Con
         else onConsultar(c);
       }}
       validar={t => (t.trim().length >= 3 ? { ok: true, valor: t.trim().replace(/\s+/g, ' ') } : { ok: false, error: 'Escriba al menos 3 caracteres del nombre, del apellido o de la cédula.' })} />
-    {error && <Aviso tipo="error">{error}</Aviso>}
+    {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
     {!consulta ? (
       <Tarjeta><Vacio titulo="Consulte una persona" icono={<UserRound size={22} />}
         texto="Escriba sus nombres y apellidos, en cualquier orden, o su cédula. El reporte muestra cuándo suele ingresar, cuánto permanece, los vehículos que usó y cada ingreso." /></Tarjeta>

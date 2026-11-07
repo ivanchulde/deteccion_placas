@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowRight, CarFront, ClipboardPlus, Clock, History, LogOut, MonitorPlay, ShieldAlert, ShieldCheck,
@@ -11,7 +12,7 @@ import { useConsulta, useDiferido, usePaginaVisible } from '../../aplicacion/hoo
 import type { Deteccion, EstadoAnpr, ResumenPanel } from '../../dominio/tipos';
 import { diaCorto, fecha, hora, numero, relativo, SERIES_ESTADO } from '../../dominio/formato';
 import { ESTADOS_ACCESO, estadoAcceso } from '../../dominio/estadoAcceso';
-import { Aviso, Cargando, FilasEsqueleto, InsigniaEstado, Kpi, Tarjeta, Vacio } from '../componentes/ui';
+import { Cargando, FilasEsqueleto, InsigniaEstado, Kpi, Tarjeta, Vacio } from '../componentes/ui';
 import { BarrasHorizontales, Dona, Leyenda } from '../componentes/Graficos';
 import { PlacaFoto, RegistroManualModal } from '../componentes/deteccion';
 import { CeldaIngreso, actualizarCampoIngreso, type CampoIngreso } from '../componentes/CeldaIngreso';
@@ -133,7 +134,7 @@ const PanelOperador: React.FC = () => {
           <Link to="/monitoreo" className="btn btn-primary"><MonitorPlay size={16} /> Abrir Gestión de Accesos</Link>
         </div>
       </div>
-      {error && <Aviso tipo="error" style={{ marginBottom: 16 }}>{error}</Aviso>}
+      {error && <AvisoFlotante tipo="error" style={{ marginBottom: 16 }}>{error}</AvisoFlotante>}
       <div className="pila">
         <section className="guardia-control">
           <RelojGuardia />
@@ -203,7 +204,7 @@ const IngresosRecientes: React.FC = () => {
   return (
     <Tarjeta titulo="Movimientos recientes" subtitulo="Ingresos sin salida o con datos pendientes para el reporte; se actualiza en tiempo real"
       acciones={<Link to="/historial" className="btn btn-ghost btn-sm"><History size={14} /> Historial completo <ArrowRight size={14} /></Link>} sinPadding>
-      {error && <Aviso tipo="error" style={{ margin: 12 }}>{error}</Aviso>}
+      {error && <AvisoFlotante tipo="error" style={{ margin: 12 }}>{error}</AvisoFlotante>}
       <div className="tabla-contenedor" style={{ maxHeight: 560 }} role="region" aria-label="Tabla de movimientos recientes" tabIndex={0}>
         <table className="tabla tabla-registros">
           <thead><tr>
@@ -263,7 +264,7 @@ const PanelGestion: React.FC = () => {
           <Link to="/monitoreo" className="btn btn-primary"><MonitorPlay size={16} /> Gestión de Accesos</Link>
         </div>
       </div>
-      {error && <Aviso tipo="error" style={{ marginBottom: 16 }}>{error}</Aviso>}
+      {error && <AvisoFlotante tipo="error" style={{ marginBottom: 16 }}>{error}</AvisoFlotante>}
       <div className="pila">
         <KpisDelDia r={r} cargando={cargando} />
         {r
