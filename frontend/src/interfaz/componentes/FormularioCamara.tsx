@@ -285,7 +285,7 @@ export const FormularioCamara: React.FC<{ camara?: Camara; onCerrar: () => void;
   };
 
   return (
-    <Modal titulo={camara ? 'Editar cámara' : 'Registrar cámara'} subtitulo="El enlace RTSP se genera con los datos del equipo" onCerrar={onCerrar} bloquear={enviando} tamano="ancho"
+    <Modal titulo={camara ? 'Editar cámara' : 'Registrar cámara'} subtitulo="El enlace RTSP se genera con los datos del equipo" onCerrar={onCerrar} bloquear={enviando} tamano="panoramico"
       pie={<>
         <button className="btn btn-secondary" onClick={onCerrar} disabled={enviando}>Cancelar</button>
         <BotonPing estado={probando ? 'probando' : errorPrueba || (prueba && !prueba.rtsp.en_linea) ? 'error' : prueba ? 'ok' : 'reposo'} onClick={probar} deshabilitado={!url || !hostValido || enviando} />
