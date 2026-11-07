@@ -38,11 +38,11 @@
   transition: transform 0.7s cubic-bezier(0.65, 0, 0.35, 1);
 }
 .auth-root[data-lado='derecha'] .auth-imagen { transform: translateX(100%); }
-.auth-imagen img {
+.auth-imagen video {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 30% 70%;
+  object-position: center;
   display: block;
 }
 .auth-imagen-velo {

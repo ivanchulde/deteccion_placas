@@ -4,7 +4,7 @@ import api from '../../../infraestructura/api';
 import { REGLAS_PASSWORD, passwordValida } from '../../../dominio/password';
 import { errorCorreoInstitucional } from '../../../dominio/validacion';
 import logoEcu911 from '../../../assets/ecu911.png';
-import fondoLogin from '../../../assets/fondo-login.webp';
+import videoLogin from '../../../assets/login.mp4';
 import './auth.css';
 
 /* ─── Estado público del sistema (GET /api/auth/estado) ─── */
@@ -75,7 +75,7 @@ export const PanelImagen: React.FC = () => {
   useEffect(() => { obtenerEstadoSistema().then(e => setUnidad(e.unidad_institucional)).catch(() => undefined); }, []);
   return (
   <div className="auth-imagen" aria-hidden="true">
-    <img src={fondoLogin} alt="" decoding="async" />
+    <video src={videoLogin} autoPlay muted loop playsInline preload="metadata" disablePictureInPicture tabIndex={-1} />
     <div className="auth-imagen-velo" />
     <div className="auth-imagen-texto">
       <div className="etiqueta" style={{ visibility: unidad ? 'visible' : 'hidden' }}><ScanLine size={14} /> {unidad ?? '·'}</div>
