@@ -134,7 +134,7 @@ export const CorreoSaliente: React.FC<{ estado: EstadoCorreo; onCambio: (e: Esta
                 onChange={e => poner('clave')(e.target.value)} autoComplete="new-password" spellCheck={false} style={{ paddingRight: 40 }}
                 placeholder={hayClave ? 'Guardada · escriba solo para cambiarla' : perfil === 'google' ? 'xxxx xxxx xxxx xxxx' : ''}
                 aria-invalid={f.clave && errores.clave ? true : undefined} aria-describedby="smtp-clave-ayuda" />
-              <button type="button" className="btn btn-ghost btn-sm btn-icono" style={{ position: 'absolute', right: 4, top: 4 }}
+              <button type="button" className="btn btn-ghost btn-sm btn-icono" style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
                 onClick={() => setVerClave(v => !v)} aria-label={verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
                 {verClave ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>

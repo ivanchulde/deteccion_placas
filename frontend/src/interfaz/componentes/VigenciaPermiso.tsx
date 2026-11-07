@@ -10,7 +10,7 @@ export const VigenciaPermiso: React.FC<{ prefijo: string; inicio: string; fin: s
   // La opción rápida que coincide con las fechas actuales queda marcada como seleccionada
   const elegida = (dias: number | null) => efectivo === hoy && fin === finDe(dias);
   const OPCIONES: [number | null, string][] = [[1, 'Solo hoy'], [7, '7 días'], [30, '30 días'], [null, 'Desde hoy, sin vencimiento']];
-  return <fieldset className="completo" style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
+  return <fieldset className="completo formulario-seccion vigencia-permiso">
     <legend className="etiqueta-campo">{titulo}</legend>
     <div className="fila" style={{ flexWrap: 'wrap', marginBottom: 12 }}>
       {OPCIONES.map(([dias, etiqueta]) => (

@@ -78,7 +78,7 @@ export const EditarRegistroHistorial: React.FC<{
             </div>
             <CampoTexto id="hist-cedula" etiqueta="Cédula" valor={ficha.cedula} onCambiar={v => cambiar('cedula', soloDigitos(v))}
               regla={REGLAS.cedula} deshabilitado={enviando} ayuda="10 dígitos, conservando los ceros iniciales." />
-            <CampoTexto id="hist-persona" className="completo" etiqueta="Nombres y apellidos" valor={ficha.persona_ingreso}
+            <CampoTexto id="hist-persona" className="completo historial-nombre" etiqueta="Nombres y apellidos" valor={ficha.persona_ingreso}
               onCambiar={v => cambiar('persona_ingreso', v)} regla={REGLAS.persona_ingreso} deshabilitado={enviando} />
             <CampoTexto id="hist-tipo" etiqueta="Vehículo" valor={ficha.tipo_vehiculo} onCambiar={v => cambiar('tipo_vehiculo', v)}
               regla={REGLAS.tipo_vehiculo} opciones={TIPOS_VEHICULO} deshabilitado={enviando} />
@@ -88,7 +88,7 @@ export const EditarRegistroHistorial: React.FC<{
               regla={REGLAS.modelo} deshabilitado={enviando} />
             <CampoTexto id="hist-color" etiqueta="Color" valor={ficha.color} onCambiar={v => cambiar('color', v)}
               regla={REGLAS.color} deshabilitado={enviando} />
-            <CampoTexto id="hist-motivo" className="completo" etiqueta="Motivo del ingreso" valor={ficha.motivo_ingreso}
+            <CampoTexto id="hist-motivo" className="completo historial-motivo" etiqueta="Motivo del ingreso" valor={ficha.motivo_ingreso}
               onCambiar={v => cambiar('motivo_ingreso', v)} regla={REGLAS.motivo_ingreso} deshabilitado={enviando} />
             <CampoTexto id="hist-correccion" className="completo" etiqueta="Motivo de la corrección*" valor={motivo} onCambiar={setMotivo}
               regla={REGLA_MOTIVO_AUDITORIA} deshabilitado={enviando} multilinea ayuda="Explique la corrección. Queda en la auditoría con su usuario." />

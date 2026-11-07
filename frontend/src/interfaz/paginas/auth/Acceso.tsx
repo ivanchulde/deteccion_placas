@@ -219,7 +219,7 @@ const Acceso: React.FC = () => {
           ) : (
             <>
               <Encabezado logoGrande={false} titulo="Registrar cuenta" subtitulo="Personal autorizado del ECU 911" />
-              <form className="auth-form compacto" onSubmit={enviarRegistro} noValidate>
+              <form className="auth-form compacto auth-registro" onSubmit={enviarRegistro} noValidate>
                 {errorRegistro && <Aviso tipo="error">{errorRegistro}</Aviso>}
 
                 <Campo id="reg-nombre" etiqueta="Nombres y apellidos completos*" placeholder="Nombres y apellidos"

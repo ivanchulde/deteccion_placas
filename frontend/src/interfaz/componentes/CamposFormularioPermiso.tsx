@@ -25,21 +25,25 @@ export const CamposFormularioPermiso: React.FC<{
   accionesVehiculo?: React.ReactNode; children?: React.ReactNode;
 }> = ({ prefijo, valor, onCambiar, horario, onHorario, errorHorario, deteccion, placaObligatoria = false, placaOpcional = false, placaFija, vehiculoObligatorio = false, incluirFotoPlaca = false, distribucion = 'normal', mostrarMotivo = true, accionesVehiculo, children }) => {
   const placaRequerida = !placaOpcional && (placaObligatoria || vehiculoObligatorio);
+  const observaciones = <CampoTexto id={`${prefijo}-obs`} className="completo" etiqueta="Observaciones" valor={valor.observaciones} onCambiar={v => onCambiar({ observaciones: v })} regla={REGLA_OBSERVACIONES} multilinea />;
   return <div className={`completo formulario-permiso${distribucion === 'panoramica' ? ' panoramico' : ''}`}>
-    {deteccion && <FotoVehiculoPermiso deteccion={deteccion} incluirPlaca={incluirFotoPlaca} />}
-    <fieldset className="permiso-persona formulario-seccion">
+    <section className="permiso-persona" aria-label="Persona y datos del acceso">
+    <fieldset className="formulario-seccion">
       <legend className="etiqueta-campo">Datos de la persona</legend>
       <div className="form-grid"><CamposPersonaPermiso prefijo={prefijo} valor={valor} onCambiar={(k, v) => onCambiar({ [k]: v })} autoFocus={!deteccion} /></div>
     </fieldset>
-    <fieldset className="permiso-vehiculo" style={{ border: '1px dashed var(--border-strong)', borderRadius: 10, padding: '10px 14px 14px' }}>
+    {children}
+    </section>
+    <section className="permiso-vehiculo-columna">
+    <fieldset className="permiso-vehiculo formulario-seccion">
       <legend className="etiqueta-campo" style={{ padding: '0 6px' }}>Datos del vehículo</legend>
+      {deteccion && <FotoVehiculoPermiso deteccion={deteccion} incluirPlaca={incluirFotoPlaca} />}
       <div className="form-grid">
         <CampoPlaca id={`${prefijo}-placa`} className="completo" etiqueta={placaRequerida ? 'Placa*' : 'Placa (opcional)'} requerido={placaRequerida} valor={valor.placa} onCambiar={v => onCambiar({ placa: v })} deshabilitado={placaFija} />
         <CamposVehiculoPermiso prefijo={prefijo} valor={valor} onCambiar={(k, v) => onCambiar({ [k]: v })} obligatorio={vehiculoObligatorio} />
       </div>
       {accionesVehiculo}
     </fieldset>
-    <section className="permiso-condiciones" aria-label="Condiciones del permiso">
     {mostrarMotivo && <div className="completo pila" style={{ gap: 6 }}>
       <CampoTexto id={`${prefijo}-motivo-ingreso`} etiqueta="Motivo de ingreso" valor={valor.motivo_ingreso ?? ''} onCambiar={v => onCambiar({ motivo_ingreso: v })}
         regla={REGLA_MOTIVO_INGRESO} placeholder="Ej.: jornada laboral, entrega de botellones de agua"
@@ -50,13 +54,14 @@ export const CamposFormularioPermiso: React.FC<{
         ))}
       </div>
     </div>}
+    </section>
+    <section className="permiso-condiciones" aria-label="Condiciones del permiso">
     <VigenciaPermiso prefijo={prefijo} inicio={valor.fecha_inicio} fin={valor.fecha_fin} onCambiar={(inicio, fin) => onCambiar({ fecha_inicio: inicio, fecha_fin: fin })} />
-    <fieldset className="completo" style={{ border: '1px dashed var(--border-strong)', borderRadius: 10, padding: '10px 14px 14px' }}>
+    <fieldset className="completo formulario-seccion">
       <legend className="etiqueta-campo" style={{ padding: '0 6px' }}>Horario de acceso</legend>
       <EditorHorario valor={horario} onCambiar={onHorario} errorGuardado={errorHorario} />
     </fieldset>
-    <CampoTexto id={`${prefijo}-obs`} className="completo" etiqueta="Observaciones" valor={valor.observaciones} onCambiar={v => onCambiar({ observaciones: v })} regla={REGLA_OBSERVACIONES} multilinea />
+    {observaciones}
     </section>
-    {children}
   </div>;
 };

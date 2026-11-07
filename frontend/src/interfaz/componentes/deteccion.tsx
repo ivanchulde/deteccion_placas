@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { AvisoFlotante } from './AvisoFlotante';
 import { useNavigate } from 'react-router-dom';
 import { ImageOff, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
@@ -235,7 +236,7 @@ export const DatosIngresoModal: React.FC<{ d: Deteccion; onCerrar: () => void; o
       </>}>
       <div className="form-grid">
         <CamposIngreso id="edi" valor={datos} onCambiar={setDatos} onEnter={() => { if (valido && !enviando) guardar(); }} />
-        <div className="completo"><Aviso tipo="info">Estos datos salen en el reporte de control vehicular (Reportes). El cambio queda en la auditoría.</Aviso></div>
+        <div className="completo"><AvisoFlotante tipo="info">Estos datos salen en el reporte de control vehicular (Reportes). El cambio queda en la auditoría.</AvisoFlotante></div>
         {error && <div className="completo"><Aviso tipo="error">{error}</Aviso></div>}
       </div>
     </Modal>
@@ -373,7 +374,8 @@ export const ValidarModal: React.FC<{ d: Deteccion; onCerrar: () => void; onVali
   };
 
   return (
-    <Modal titulo={d.tipo_movimiento === 'salida' ? 'Corregir lectura de salida' : excepcion ? 'Autorizar ingreso por excepción' : 'Autorizar ingreso'} subtitulo={`${fechaHora(d.fecha_hora_ingreso)}${d.camara ? ` · ${d.camara.nombre}` : ''}`} onCerrar={onCerrar} bloquear={enviando} tamano={esIngreso ? 'panoramico' : 'ancho'}
+    <Modal titulo={d.tipo_movimiento === 'salida' ? 'Corregir lectura de salida' : excepcion ? 'Autorizar ingreso por excepción' : 'Autorizar ingreso'} subtitulo={<>{fechaHora(d.fecha_hora_ingreso)}{d.camara ? ` · ${d.camara.nombre}` : ''} · Lectura: <b>{d.placa_reconocida ? formatearPlaca(d.placa_reconocida) : 'sin lectura'}</b>
+      {d.confianza_ocr !== null && <> · confianza <b style={{ color: colorConfianza(d.confianza_ocr) }}>{porcentaje(d.confianza_ocr)}</b></>}</>} onCerrar={onCerrar} bloquear={enviando} tamano={esIngreso ? 'panoramico' : 'ancho'}
       pie={<>
         <button className="btn btn-secondary" onClick={onCerrar} disabled={enviando}>Cancelar</button>
         <button className={`btn ${excepcion ? 'btn-exito' : 'btn-navy'}`} onClick={guardar} disabled={!valida || enviando}>{enviando && <Loader2 size={14} className="girar" />} {excepcion ? 'Autorizar por excepción' : d.tipo_movimiento === 'salida' ? 'Registrar salida' : placa.trim() ? 'Confirmar placa' : 'Confirmar ingreso sin placa'}</button>
@@ -388,33 +390,30 @@ export const ValidarModal: React.FC<{ d: Deteccion; onCerrar: () => void; onVali
         </div>
         }
         {d.motivo_revision && <Aviso tipo="advertencia">{d.motivo_revision}</Aviso>}
-        <div className="texto-secundario">
-          Lectura automática: <b style={{ color: 'var(--text)' }}>{d.placa_reconocida ? formatearPlaca(d.placa_reconocida) : 'sin lectura'}</b>
-          {d.confianza_ocr !== null && <> · confianza <b style={{ color: colorConfianza(d.confianza_ocr) }}>{porcentaje(d.confianza_ocr)}</b></>}
-        </div>
         <ObservacionOcr evidencia={d.evidencia_lectura} />
         <div className="form-grid">
           {esIngreso ? <CamposFormularioPermiso prefijo="val" placaOpcional valor={{ ...permiso, placa }} onCambiar={c => { if (c.placa !== undefined) setPlaca(c.placa); setPermiso(x => ({ ...x, ...c })); }} horario={horario} onHorario={h => { setHorario(h); setErrorHorario(null); }} errorHorario={errorHorario} deteccion={d} vehiculoObligatorio incluirFotoPlaca distribucion="panoramica" mostrarMotivo={false}
             accionesVehiculo={<div className="pila" style={{ marginTop: 8, gap: 6 }}>
               <button type="button" className="btn btn-secondary btn-sm" disabled={!placa.trim() || enviando} onClick={sinPlacaLegible}>Sin placa legible</button>
-              <small className="texto-secundario">Deje la placa vacía si es ilegible o muestra un rótulo de concesionaria. Se conservan las fotos y la observación OCR; podrá registrar su salida con los demás datos completos.</small>
-            </div>} /> : <CampoPlaca id="val-placa" etiqueta="Placa confirmada (opcional)" requerido={false} valor={placa} onCambiar={setPlaca} ayuda="Puede dejarla vacía cuando no sea legible." />}
-          {esIngreso && consultaPlaca === 'consultando' && <small className="texto-secundario">Consultando la placa corregida en la lista blanca…</small>}
-          {esIngreso && consultaPlaca === 'encontrada' && <Aviso tipo="info">Placa confirmada en la lista blanca. Se cargaron los datos del titular y del vehículo.</Aviso>}
-          {esIngreso && consultaPlaca === 'no-encontrada' && (agregaPadron
-            ? <Aviso tipo="info">Esta placa no tiene permiso. Al confirmarla con los datos completos <b>se agrega a la lista blanca</b> con la vigencia y el horario indicados.</Aviso>
-            : <small className="texto-secundario">No existe un permiso vigente para esta placa. Revise la placa y los datos antes de autorizar.</small>)}
-          {esIngreso && consultaPlaca === 'alerta' && <Aviso tipo="error">La placa está en la lista negra: no se agregará a la lista blanca.</Aviso>}
+              <small className="texto-secundario">Deje la placa vacía si es ilegible o de concesionaria. Las fotos y el OCR se conservan; complete los demás datos para registrar la salida.</small>
+            </div>}>
           {excepcion && <CampoTexto id="val-validacion" className="completo" etiqueta="Motivo de la excepción*"
             valor={observacion} onCambiar={setObservacion} regla={reglaObservacion}
             onEnter={() => { if (valida && !enviando) guardar(); }}
             placeholder={excepcion ? 'Ej.: reunión extraordinaria autorizada por la Coordinación Zonal' : 'Ej.: placa sucia, lectura corregida por el operador'} />}
           {esIngreso && <CamposIngreso id="val" valor={ingreso} onCambiar={setIngreso} mostrarPersona={false} mostrarMotivo={!excepcion} onEnter={() => { if (valida && !enviando) guardar(); }} />}
+          </CamposFormularioPermiso> : <CampoPlaca id="val-placa" etiqueta="Placa confirmada (opcional)" requerido={false} valor={placa} onCambiar={setPlaca} ayuda="Puede dejarla vacía cuando no sea legible." />}
+          {esIngreso && consultaPlaca === 'consultando' && <small className="texto-secundario">Consultando la placa corregida en la lista blanca…</small>}
+          {esIngreso && consultaPlaca === 'encontrada' && <AvisoFlotante tipo="info">Placa confirmada en la lista blanca. Se cargaron los datos del titular y del vehículo.</AvisoFlotante>}
+          {esIngreso && consultaPlaca === 'no-encontrada' && (agregaPadron
+            ? <AvisoFlotante tipo="info">Esta placa no tiene permiso. Al confirmarla con los datos completos <b>se agrega a la lista blanca</b> con la vigencia y el horario indicados.</AvisoFlotante>
+            : <small className="texto-secundario">No existe un permiso vigente para esta placa. Revise la placa y los datos antes de autorizar.</small>)}
+          {esIngreso && consultaPlaca === 'alerta' && <Aviso tipo="error">La placa está en la lista negra: no se agregará a la lista blanca.</Aviso>}
         </div>
-        {d.tipo_movimiento === 'salida' ? <Aviso tipo="info">La corrección registra únicamente el egreso; no modifica listas ni decisiones de autorización de ingreso.</Aviso> : <Aviso tipo="info">{excepcion
+        {d.tipo_movimiento === 'salida' ? <AvisoFlotante tipo="info">La corrección registra únicamente el egreso; no modifica listas ni decisiones de autorización de ingreso.</AvisoFlotante> : <AvisoFlotante tipo="info">{excepcion
           ? 'La excepción concede solo este paso: el permiso conserva su horario y vigencia. Queda registrada en la auditoría con su usuario y el motivo.'
           : !placa.trim() ? 'Se registra el ingreso sin placa legible y se conservan las fotos y la observación OCR. Complete los demás datos para registrar después su salida.'
-            : 'Al confirmar, la placa se vuelve a cruzar con la lista blanca (vigencia y horario) y la lista negra. La corrección queda registrada con su usuario.'}</Aviso>}
+            : 'Al confirmar, la placa se vuelve a cruzar con la lista blanca (vigencia y horario) y la lista negra. La corrección queda registrada con su usuario.'}</AvisoFlotante>}
         {error && <Aviso tipo="error">{error}</Aviso>}
       </div>
       {zoom && <VisorZoom d={d} onCerrar={() => setZoom(false)} />}
@@ -526,12 +525,15 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
   };
 
   return (
-    <Modal titulo={`Registrar ${camaraSeleccionada?.direccion === 'salida' ? 'salida' : 'ingreso'} manual`} subtitulo="Para movimientos que la cámara no registró o no pudo leer" onCerrar={onCerrar} bloquear={enviando}
+    <Modal titulo={`Registrar ${camaraSeleccionada?.direccion === 'salida' ? 'salida' : 'ingreso'} manual`} subtitulo="Para movimientos que la cámara no registró o no pudo leer" onCerrar={onCerrar} bloquear={enviando} tamano="panoramico"
       pie={<>
         <button className="btn btn-secondary" onClick={onCerrar} disabled={enviando}>Cancelar</button>
         <button className="btn btn-navy" onClick={guardar} disabled={!valido || enviando}>{enviando && <Loader2 size={14} className="girar" />} Registrar {camaraSeleccionada?.direccion === 'salida' ? 'salida' : 'ingreso'}</button>
       </>}>
-      <div className="form-grid">
+      <div className="formulario-manual">
+        <section className="formulario-seccion">
+          <h4 className="permiso-seccion-titulo">Vehículo y cámara</h4>
+          <div className="form-grid">
         <CampoPlaca id="man-placa" etiqueta="Placa (opcional)" requerido={false} valor={placa} onCambiar={setPlaca} autoFocus
           ayuda="Déjela vacía cuando sea ilegible, no tenga matrícula o muestre un rótulo de concesionaria. Se guardará sin placa." />
         <div className="campo completo">
@@ -548,6 +550,11 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
           <CampoTexto id="man-marca" etiqueta="Marca del vehículo" valor={marca} onCambiar={setMarca}
             regla={REGLAS_VEHICULO.marca} opciones={MARCAS} placeholder="Seleccione o escriba otra marca" />
         </>}
+          </div>
+        </section>
+        <section className="formulario-seccion">
+          <h4 className="permiso-seccion-titulo">Datos del registro</h4>
+          <div className="form-grid">
         <div className="completo pila" style={{ gap: 6 }}>
           <CampoTexto id="man-motivo-registro" etiqueta="Motivo del registro manual*" valor={motivo} onCambiar={setMotivo}
             regla={REGLA_MOTIVO_MANUAL} multilinea ayuda="Entre 5 y 300 caracteres."
@@ -560,10 +567,12 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
           </div>
         </div>
         {esIngreso && <CamposIngreso id="man" valor={ingreso} onCambiar={setIngreso} />}
-        <div className="completo"><Aviso tipo="info">{camaraSeleccionada?.direccion === 'salida'
+          </div>
+        </section>
+        <div className="completo"><AvisoFlotante tipo="info">{camaraSeleccionada?.direccion === 'salida'
           ? 'La salida se registra como movimiento independiente y no modifica permisos ni decisiones de ingreso.'
           : !placa.trim() ? 'El ingreso se guarda sin placa legible. Complete los datos de la persona, el vehículo y el motivo para poder registrar su salida.'
-            : 'El ingreso se cruza con las listas como cualquier lectura. No modifica el padrón de autorizados: para autorizar un vehículo use la pantalla de listas.'}</Aviso></div>
+            : 'El ingreso se cruza con las listas como cualquier lectura. No modifica el padrón de autorizados: para autorizar un vehículo use la pantalla de listas.'}</AvisoFlotante></div>
         {error && <div className="completo"><Aviso tipo="error">{error}</Aviso></div>}
       </div>
     </Modal>

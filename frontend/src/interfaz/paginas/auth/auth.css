@@ -137,8 +137,8 @@
 .auth-lado.derecha.oculto { transform: translateX(48px); }
 .auth-lado.visible { opacity: 1; transform: none; z-index: 10; }
 
-.auth-caja { width: 100%; max-width: 430px; padding: 16px 0; margin: auto 0; }
-.auth-caja.ancha { max-width: 460px; }
+.auth-caja { width: 100%; max-width: 500px; padding: 16px 0; margin: auto 0; }
+.auth-caja.ancha { max-width: 650px; }
 
 @media (max-width: 1023px) {
   .auth-imagen { display: none; }
@@ -183,14 +183,15 @@
 .auth-campo-marco {
   position: relative;
   border: 1px solid var(--auth-borde);
-  border-radius: 8px;
-  padding: 12px 12px 10px;
+  border-radius: 12px;
+  min-height: 56px;
+  padding: 15px 14px 13px;
   background: #ffffff;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .auth-campo-marco:focus-within {
   border-color: var(--auth-rojo);
-  box-shadow: 0 0 0 1px rgba(185, 28, 28, 0.25);
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
 }
 .auth-campo-marco.error { border-color: #ef4444; }
 .auth-campo-marco label {
@@ -204,14 +205,14 @@
   color: var(--auth-texto-2);
   pointer-events: none;
 }
-.auth-campo-fila { display: flex; align-items: center; gap: 10px; }
+.auth-campo-fila { display: flex; align-items: center; gap: 12px; min-height: 26px; }
 .auth-campo-fila input, .auth-campo-fila select {
   flex: 1;
   min-width: 0;
   border: none;
   outline: none;
   background: transparent;
-  font-size: 14px;
+  font-size: 15px;
   color: #111827;
   font-family: inherit;
 }
@@ -431,4 +432,15 @@
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
+}
+
+/* El alta de cuenta aprovecha el ancho para evitar una columna larga en escritorio. */
+@media (min-width: 700px) {
+  .auth-registro { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 16px; }
+  .auth-registro > * { grid-column: 1 / -1; min-width: 0; }
+  .auth-registro > :has(#reg-rol), .auth-registro > :has(#reg-email),
+  .auth-registro > :has(#reg-pass), .auth-registro > :has(#reg-conf) { grid-column: auto; }
+}
+@media (max-width: 640px) {
+  .auth-campo-fila input, .auth-campo-fila select { font-size: 16px; }
 }

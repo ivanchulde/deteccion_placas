@@ -149,7 +149,7 @@ const FormularioUsuario: React.FC<{
         </>}
         <div className="campo completo">
           <span className="etiqueta-campo">Rol*</span>
-          <div className="grid-2" style={{ gap: 8 }}>
+          <div className="formulario-roles">
             {ROLES_ORDEN.map(r => (
               <label key={r} className={`tarjeta`} style={{ padding: 12, cursor: esPropio ? 'not-allowed' : 'pointer', borderColor: f.rol === r ? 'var(--navy-700)' : undefined, boxShadow: f.rol === r ? '0 0 0 2px rgba(21,49,93,0.15)' : undefined, opacity: esPropio && f.rol !== r ? 0.5 : 1 }}>
                 <span className="fila" style={{ gap: 8 }}>

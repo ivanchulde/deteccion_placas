@@ -89,7 +89,7 @@ export const FormularioSolicitud: React.FC<{
       subtitulo={solicitud
         ? 'Puede corregirla mientras esté pendiente. El gestor de permisos verá los datos actualizados.'
         : 'El gestor de permisos recibirá la solicitud de inmediato y decidirá si concede el permiso.'}
-      onCerrar={onCerrar} bloquear={enviando} tamano="ancho"
+      onCerrar={onCerrar} bloquear={enviando} tamano="panoramico"
       pie={<>
         <button className="btn btn-secondary" onClick={onCerrar} disabled={enviando}>Cancelar</button>
         <button className="btn btn-navy" onClick={enviar} disabled={!valido || enviando}>
@@ -97,7 +97,7 @@ export const FormularioSolicitud: React.FC<{
         </button>
       </>}>
       <div className="form-grid">
-        <CamposFormularioPermiso prefijo="s" valor={f} onCambiar={c => setF(x => ({ ...x, ...c }))} horario={horario} onHorario={setHorario} deteccion={deteccion} placaObligatoria mostrarMotivo={false}>
+        <CamposFormularioPermiso distribucion="panoramica" prefijo="s" valor={f} onCambiar={c => setF(x => ({ ...x, ...c }))} horario={horario} onHorario={setHorario} deteccion={deteccion} placaObligatoria mostrarMotivo={false}>
         <CampoTexto id="s-motivo" className="completo" etiqueta="Motivo del ingreso*" valor={f.motivo} onCambiar={poner('motivo')}
           regla={REGLAS_SOLICITUD.motivo} multilinea ayuda="Entre 5 y 300 caracteres."
           placeholder="Ej.: entrega de equipos de radio, reunión con el coordinador zonal" />
@@ -169,7 +169,7 @@ export const AprobarSolicitud: React.FC<{ s: SolicitudAcceso; onCerrar: () => vo
 
   return (
     <Modal titulo={<>Aprobar solicitud #{s.id} · <Placa valor={s.placa} /></>} subtitulo={`${s.solicitante.nombre} · ${fechaHora(s.fecha_solicitud)}`}
-      onCerrar={onCerrar} bloquear={enviando} tamano="ancho"
+      onCerrar={onCerrar} bloquear={enviando} tamano="panoramico"
       pie={<>
         <button className="btn btn-secondary" onClick={onCerrar} disabled={enviando}>Cancelar</button>
         <button className="btn btn-exito" onClick={aprobar} disabled={!valido || enviando}>{enviando ? <Loader2 size={14} className="girar" /> : <ShieldCheck size={14} />} Aprobar y agregar a lista blanca</button>
@@ -185,9 +185,10 @@ export const AprobarSolicitud: React.FC<{ s: SolicitudAcceso; onCerrar: () => vo
           <dt>Vehículo</dt><dd>{[s.vehiculo.tipo, s.vehiculo.marca, s.vehiculo.modelo, s.vehiculo.color].filter(Boolean).join(' · ') || '—'}</dd>
         </dl>
         <div className="form-grid">
-          <CamposFormularioPermiso prefijo="a" valor={{ ...a, placa: s.placa }} onCambiar={c => { const { placa: _placa, ...ajustes } = c; setA(x => ({ ...x, ...ajustes })); }} horario={horario} onHorario={setHorario} placaObligatoria placaFija vehiculoObligatorio={validarIngreso} />
-          <CampoTexto id="a-com" className="completo" etiqueta="Comentario para el solicitante" valor={a.comentario}
-            onCambiar={v => setA({ ...a, comentario: v })} regla={REGLA_COMENTARIO_APROBACION} placeholder="Opcional" />
+          <CamposFormularioPermiso distribucion="panoramica" prefijo="a" valor={{ ...a, placa: s.placa }} onCambiar={c => { const { placa: _placa, ...ajustes } = c; setA(x => ({ ...x, ...ajustes })); }} horario={horario} onHorario={setHorario} placaObligatoria placaFija vehiculoObligatorio={validarIngreso}>
+            <CampoTexto id="a-com" etiqueta="Comentario para el solicitante" valor={a.comentario}
+              onCambiar={v => setA({ ...a, comentario: v })} regla={REGLA_COMENTARIO_APROBACION} placeholder="Opcional" />
+          </CamposFormularioPermiso>
           {s.deteccion_id && puedeValidar && (
             <label className="completo fila" style={{ gap: 8, cursor: 'pointer' }}>
               <input type="checkbox" checked={validarIngreso} onChange={e => setValidarIngreso(e.target.checked)} />

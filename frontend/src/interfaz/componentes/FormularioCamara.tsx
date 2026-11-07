@@ -292,102 +292,122 @@ export const FormularioCamara: React.FC<{ camara?: Camara; onCerrar: () => void;
         <button className="btn btn-secondary" onClick={() => setReproducir(true)} disabled={!url || !hostValido || enviando}><Play size={14} /> Play</button>
         <button className="btn btn-navy" onClick={guardar} disabled={!valido || enviando}>{enviando && <Loader2 size={14} className="girar" />} Guardar</button>
       </>}>
-      <div className="form-grid">
-        <CampoTexto id="c-nombre" etiqueta="Nombre*" valor={nombre} onCambiar={setNombre} regla={REGLAS_CAMARA.nombre}
-          placeholder="Ej.: Garita principal - entrada" autoFocus />
-        <CampoTexto id="c-ubic" etiqueta="Ubicación*" valor={ubicacion} onCambiar={setUbicacion} regla={REGLAS_CAMARA.ubicacion}
-          placeholder="Ej.: Acceso vehicular norte" />
-        <div className="campo"><label htmlFor="c-direccion">Tipo de paso*</label>
-          <select id="c-direccion" className="select" value={direccion} onChange={e => setDireccion(e.target.value as Camara['direccion'])}>
-            <option value="ingreso">Ingreso</option>
-            <option value="salida">Salida</option>
-          </select>
-          <span className="ayuda">Las salidas no se bloquean por permisos de ingreso. Pueden cerrar solas el ingreso del vehículo: se activa en Configuración › Operación.</span>
-        </div>
-        <div className="campo">
-          <span className="etiqueta-campo">Detección de placas</span>
-          <label className="fila" style={{ gap: 8, cursor: 'pointer', flexWrap: 'nowrap', marginTop: 6 }}>
-            <input type="checkbox" checked={analisis} onChange={e => setAnalisis(e.target.checked)} />
-            <span>Analizar esta cámara con el motor ANPR</span>
-          </label>
-          <span className="ayuda">Sin marcar, la cámara solo muestra su video: no registra pasos ni consume el procesador del motor.</span>
-        </div>
-
-        <div className="campo completo"><label htmlFor="c-perfil">Tipo de equipo</label>
-          <select id="c-perfil" className="select" value={perfil} onChange={e => cambiarPerfil(e.target.value as Perfil)}>
-            {(Object.keys(PERFILES) as Perfil[]).map(k => <option key={k} value={k}>{PERFILES[k].etiqueta}</option>)}
-          </select>
-          {p.ayuda && <span className="ayuda">{p.ayuda}</span>}
-        </div>
-
-        {perfil === 'manual' ? (
-          <>
-            <CampoUrl valor={urlManual} error={errorUrl} onCambiar={v => { setUrlManual(v); setPrueba(null); }} />
-            <CampoTexto id="c-url-vista" className="completo" etiqueta="URL del flujo de vista (opcional)" valor={urlVistaManual}
-              onCambiar={v => { setUrlVistaManual(v); setPrueba(null); }} error={errorVista}
-              regla={REGLA_URL_VISTA} filtrar={sinEspacios} literal claseControl="mono"
-              placeholder="rtsp://usuario:contraseña@192.0.2.10:554/Streaming/Channels/102"
-              ayuda="Flujo secundario (H.264, baja resolución) que se muestra en el navegador mientras el motor analiza el principal. Vacío: se muestra el principal." />
-          </>
-        ) : (
-          <>
-            <CampoTexto id="c-host" etiqueta="IP o nombre del equipo*" valor={host} onCambiar={v => { setHost(v); setPrueba(null); }}
-              regla={REGLA_HOST} error={errorHost} filtrar={filtrarHost} literal
-              claseControl="mono" placeholder="Ej.: 192.0.2.10" ayuda="Solo números, letras, puntos y guiones (sin rtsp:// ni puerto)." />
-            <div className="form-grid" style={{ gridTemplateColumns: '110px 1fr', gap: 10 }}>
-              <CampoEntero id="c-puerto" etiqueta="Puerto*" nombre="Puerto" valor={puerto} min={1} max={65535} requerido claseControl="mono"
-                onCambiar={v => { setPuerto(v); setPrueba(null); }} />
-              <CampoTexto id="c-ruta" etiqueta="Ruta del flujo" valor={ruta} onCambiar={v => { setRuta(v); setPrueba(null); }}
-                regla={REGLA_RUTA} filtrar={sinEspacios} literal claseControl="mono" />
-            </div>
-            <CampoTexto id="c-usuario" etiqueta={`Usuario${exigeCredenciales ? '*' : ''}`} valor={usuario}
-              onCambiar={v => { setUsuario(v); setPrueba(null); }} regla={reglaUsuario(exigeCredenciales)} filtrar={sinEspacios} literal autoComplete="off" />
-            <div className="campo"><label htmlFor="c-clave">Contraseña{exigeCredenciales && !claveGuardada ? '*' : ''}</label>
-              <div style={{ position: 'relative' }}>
-                <input id="c-clave" className="input" type={verClave ? 'text' : 'password'} value={clave} onChange={e => { setClave(e.target.value); setPrueba(null); }}
-                  onBlur={() => setClaveTocada(true)} maxLength={100} autoComplete="new-password" style={{ paddingRight: 40 }}
-                  placeholder={claveGuardada ? 'Guardada · deje vacío para conservarla' : ''} disabled={!usuario.trim()}
-                  aria-required={(exigeCredenciales && !claveGuardada) || reescribirClave || undefined}
-                  aria-invalid={(claveTocada || reescribirClave) && errorClave ? true : undefined}
-                  aria-describedby={(claveTocada || reescribirClave) && errorClave ? 'c-clave-error' : !usuario.trim() ? 'c-clave-ayuda' : undefined} />
-                <button type="button" className="btn btn-ghost btn-sm btn-icono" style={{ position: 'absolute', right: 4, top: 4 }} onClick={() => setVerClave(v => !v)} aria-label={verClave ? 'Ocultar' : 'Mostrar'}>
-                  {verClave ? <EyeOff size={15} /> : <Eye size={15} />}</button>
+      <div className="pila">
+        <div className="formulario-camara">
+          <fieldset className="formulario-seccion camara-identidad">
+            <legend>Identificación y operación</legend>
+            <div className="form-grid">
+              <CampoTexto id="c-nombre" etiqueta="Nombre*" valor={nombre} onCambiar={setNombre} regla={REGLAS_CAMARA.nombre}
+                placeholder="Ej.: Garita principal - entrada" autoFocus />
+              <CampoTexto id="c-ubic" etiqueta="Ubicación*" valor={ubicacion} onCambiar={setUbicacion} regla={REGLAS_CAMARA.ubicacion}
+                placeholder="Ej.: Acceso vehicular norte" />
+              <div className="campo"><label htmlFor="c-direccion">Tipo de paso*</label>
+                <select id="c-direccion" className="select" value={direccion} onChange={e => setDireccion(e.target.value as Camara['direccion'])}>
+                  <option value="ingreso">Ingreso</option>
+                  <option value="salida">Salida</option>
+                </select>
+                <span className="ayuda">Las salidas no se bloquean por permisos de ingreso. Pueden cerrar solas el ingreso del vehículo: se activa en Configuración › Operación.</span>
               </div>
-              {(claveTocada || reescribirClave) && errorClave
-                ? <span id="c-clave-error" className="error">{errorClave}</span>
-                : !usuario.trim() && <span id="c-clave-ayuda" className="ayuda">Ingrese primero el usuario.</span>}
-            </div>
-            <div className="campo completo">
-              <span className="etiqueta-campo">Enlace RTSP generado</span>
-              <div className="mono" style={{ padding: '9px 12px', borderRadius: 8, background: 'var(--surface-3)', border: `1px dashed ${errorEnlace ? 'var(--alerta)' : 'var(--border-strong)'}`, fontSize: 12.5, wordBreak: 'break-all', color: url ? 'var(--text)' : 'var(--text-4)' }}>
-                {urlVisible || 'Complete la IP para generar el enlace'}
-              </div>
-              {errorEnlace
-                ? <span className="error">{errorEnlace === MENSAJE_URL_RTSP
-                  ? 'El enlace tiene espacios o caracteres no permitidos (< >): revise la ruta del flujo.'
-                  : `El enlace supera los ${LARGO_MAXIMO_RTSP} caracteres que admite el sistema: acorte la ruta, el usuario o la contraseña.`}</span>
-                : <span className="ayuda">La contraseña se guarda cifrada en el servidor y no se muestra a ningún usuario.</span>}
-            </div>
-            {secundaria && (
-              <div className="campo completo">
-                <label className="fila" style={{ gap: 8, cursor: 'pointer', flexWrap: 'nowrap' }}>
-                  <input type="checkbox" checked={usarVista} onChange={e => { setUsarVista(e.target.checked); setPrueba(null); }} />
-                  <span><b>Vista en vivo por el flujo secundario</b> (recomendado)</span>
+              <div className="campo">
+                <span className="etiqueta-campo">Detección de placas</span>
+                <label className="fila" style={{ gap: 8, cursor: 'pointer', flexWrap: 'nowrap', marginTop: 6 }}>
+                  <input type="checkbox" checked={analisis} onChange={e => setAnalisis(e.target.checked)} />
+                  <span>Analizar esta cámara con el motor ANPR</span>
                 </label>
-                <span className="ayuda">
-                  El motor ANPR analiza el flujo principal a máxima resolución y el navegador muestra el secundario: menos ancho de banda
-                  y se reproduce en cualquier navegador aunque el principal esté en H.265. En la cámara configure el secundario en H.264, 640×360.
-                </span>
-                {usarVista && (
-                  <div className="mono" style={{ marginTop: 6, padding: '9px 12px', borderRadius: 8, background: 'var(--surface-3)', border: `1px dashed ${errorVista ? 'var(--alerta)' : 'var(--border-strong)'}`, fontSize: 12.5, wordBreak: 'break-all' }}>
-                    {urlVistaVisible || 'Complete la IP para generar el enlace'}
-                  </div>
-                )}
-                {errorVista && <span className="error">El enlace del flujo secundario no es válido o supera los {LARGO_MAXIMO_RTSP} caracteres.</span>}
+                <span className="ayuda">Sin marcar, la cámara solo muestra su video: no registra pasos ni consume el procesador del motor.</span>
               </div>
-            )}
-          </>
-        )}
+
+            </div>
+          </fieldset>
+
+          <fieldset className="formulario-seccion camara-conexion">
+            <legend>Conexión del equipo</legend>
+            <div className="form-grid">
+              <div className="campo completo"><label htmlFor="c-perfil">Tipo de equipo</label>
+                <select id="c-perfil" className="select" value={perfil} onChange={e => cambiarPerfil(e.target.value as Perfil)}>
+                  {(Object.keys(PERFILES) as Perfil[]).map(k => <option key={k} value={k}>{PERFILES[k].etiqueta}</option>)}
+                </select>
+                {p.ayuda && <details className="camara-ayuda"><summary>Guía de conexión del equipo</summary><p>{p.ayuda}</p></details>}
+              </div>
+
+              {perfil === 'manual' ? (
+                <CampoUrl valor={urlManual} error={errorUrl} onCambiar={v => { setUrlManual(v); setPrueba(null); }} />
+              ) : (
+                <>
+                  <CampoTexto id="c-host" className="completo" etiqueta="IP o nombre del equipo*" valor={host} onCambiar={v => { setHost(v); setPrueba(null); }}
+                    regla={REGLA_HOST} error={errorHost} filtrar={filtrarHost} literal
+                    claseControl="mono" placeholder="Ej.: 192.0.2.10" ayuda="Solo números, letras, puntos y guiones (sin rtsp:// ni puerto)." />
+                  <div className="form-grid completo camara-puerto-ruta">
+                    <CampoEntero id="c-puerto" etiqueta="Puerto*" nombre="Puerto" valor={puerto} min={1} max={65535} requerido claseControl="mono"
+                      onCambiar={v => { setPuerto(v); setPrueba(null); }} />
+                    <CampoTexto id="c-ruta" etiqueta="Ruta del flujo" valor={ruta} onCambiar={v => { setRuta(v); setPrueba(null); }}
+                      regla={REGLA_RUTA} filtrar={sinEspacios} literal claseControl="mono" />
+                  </div>
+                  <div className="form-grid completo camara-credenciales">
+                    <CampoTexto id="c-usuario" etiqueta={`Usuario${exigeCredenciales ? '*' : ''}`} valor={usuario}
+                      onCambiar={v => { setUsuario(v); setPrueba(null); }} regla={reglaUsuario(exigeCredenciales)} filtrar={sinEspacios} literal autoComplete="off" />
+                    <div className="campo"><label htmlFor="c-clave">Contraseña{exigeCredenciales && !claveGuardada ? '*' : ''}</label>
+                      <div style={{ position: 'relative' }}>
+                        <input id="c-clave" className="input" type={verClave ? 'text' : 'password'} value={clave} onChange={e => { setClave(e.target.value); setPrueba(null); }}
+                          onBlur={() => setClaveTocada(true)} maxLength={100} autoComplete="new-password" style={{ paddingRight: 40 }}
+                          placeholder={claveGuardada ? 'Guardada · deje vacío para conservarla' : ''} disabled={!usuario.trim()}
+                          aria-required={(exigeCredenciales && !claveGuardada) || reescribirClave || undefined}
+                          aria-invalid={(claveTocada || reescribirClave) && errorClave ? true : undefined}
+                          aria-describedby={(claveTocada || reescribirClave) && errorClave ? 'c-clave-error' : !usuario.trim() ? 'c-clave-ayuda' : undefined} />
+                        <button type="button" className="btn btn-ghost btn-sm btn-icono" style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }} onClick={() => setVerClave(v => !v)} aria-label={verClave ? 'Ocultar' : 'Mostrar'}>
+                          {verClave ? <EyeOff size={15} /> : <Eye size={15} />}</button>
+                      </div>
+                      {(claveTocada || reescribirClave) && errorClave
+                        ? <span id="c-clave-error" className="error">{errorClave}</span>
+                        : !usuario.trim() && <span id="c-clave-ayuda" className="ayuda">Ingrese primero el usuario.</span>}
+                    </div>
+                  </div>
+                  <div className="campo completo">
+                    <span className="etiqueta-campo">Enlace RTSP generado</span>
+                    <div className="mono" style={{ padding: '9px 12px', borderRadius: 8, background: 'var(--surface-3)', border: `1px dashed ${errorEnlace ? 'var(--alerta)' : 'var(--border-strong)'}`, fontSize: 12.5, wordBreak: 'break-all', color: url ? 'var(--text)' : 'var(--text-4)' }}>
+                      {urlVisible || 'Complete la IP para generar el enlace'}
+                    </div>
+                    {errorEnlace
+                      ? <span className="error">{errorEnlace === MENSAJE_URL_RTSP
+                        ? 'El enlace tiene espacios o caracteres no permitidos (< >): revise la ruta del flujo.'
+                        : `El enlace supera los ${LARGO_MAXIMO_RTSP} caracteres que admite el sistema: acorte la ruta, el usuario o la contraseña.`}</span>
+                      : <span className="ayuda">La contraseña se guarda cifrada en el servidor y no se muestra a ningún usuario.</span>}
+                  </div>
+                </>
+              )}
+            </div>
+          </fieldset>
+
+          <fieldset className="formulario-seccion camara-vista">
+            <legend>Vista en vivo</legend>
+            <div className="form-grid">
+              {perfil === 'manual' ? (
+                <CampoTexto id="c-url-vista" className="completo" etiqueta="URL del flujo de vista (opcional)" valor={urlVistaManual}
+                  onCambiar={v => { setUrlVistaManual(v); setPrueba(null); }} error={errorVista}
+                  regla={REGLA_URL_VISTA} filtrar={sinEspacios} literal claseControl="mono"
+                  placeholder="rtsp://usuario:contraseña@192.0.2.10:554/Streaming/Channels/102"
+                  ayuda="Flujo secundario (H.264, baja resolución) que se muestra en el navegador mientras el motor analiza el principal. Vacío: se muestra el principal." />
+              ) : secundaria ? (
+                <div className="campo completo">
+                  <label className="fila" style={{ gap: 8, cursor: 'pointer', flexWrap: 'nowrap' }}>
+                    <input type="checkbox" checked={usarVista} onChange={e => { setUsarVista(e.target.checked); setPrueba(null); }} />
+                    <span><b>Vista en vivo por el flujo secundario</b> (recomendado)</span>
+                  </label>
+                  <span className="ayuda">
+                    El motor ANPR analiza el flujo principal a máxima resolución y el navegador muestra el secundario: menos ancho de banda
+                    y se reproduce en cualquier navegador aunque el principal esté en H.265. En la cámara configure el secundario en H.264, 640×360.
+                  </span>
+                  {usarVista && (
+                    <div className="mono" style={{ marginTop: 6, padding: '9px 12px', borderRadius: 8, background: 'var(--surface-3)', border: `1px dashed ${errorVista ? 'var(--alerta)' : 'var(--border-strong)'}`, fontSize: 12.5, wordBreak: 'break-all' }}>
+                      {urlVistaVisible || 'Complete la IP para generar el enlace'}
+                    </div>
+                  )}
+                  {errorVista && <span className="error">El enlace del flujo secundario no es válido o supera los {LARGO_MAXIMO_RTSP} caracteres.</span>}
+                </div>
+              ) : <p className="ayuda completo">El flujo principal también se utiliza para la vista en vivo.</p>}
+            </div>
+          </fieldset>
+        </div>
 
         {prueba && <div className="completo"><PanelDiagnostico resultado={prueba} /></div>}
         {prueba && pruebaVista && (
