@@ -1128,11 +1128,6 @@ a.kpi:hover, button.kpi:hover { border-color: var(--kpi-color, var(--border-stro
 .tooltip-grafico .fila-tt i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 .tooltip-grafico .fila-tt b { color: #fff; font-variant-numeric: tabular-nums; margin-left: 12px; }
 
-.barra-h { display: grid; grid-template-columns: minmax(90px, 160px) 1fr auto; gap: 10px; align-items: center; font-size: 12.5px; }
-.barra-h .pista { height: 10px; background: var(--surface-3); border-radius: 5px; overflow: hidden; display: flex; gap: 2px; }
-.barra-h .pista > div { height: 100%; }
-.barra-h .pista > div:last-child { border-radius: 0 5px 5px 0; }
-.barra-h .valor { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text); min-width: 32px; text-align: right; }
 
 /* Indicador de estado (punto) */
 .punto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }

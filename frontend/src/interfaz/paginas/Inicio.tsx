@@ -13,7 +13,7 @@ import type { Deteccion, EstadoAnpr, ResumenPanel } from '../../dominio/tipos';
 import { diaCorto, fecha, hora, numero, relativo, SERIES_ESTADO } from '../../dominio/formato';
 import { ESTADOS_ACCESO, estadoAcceso } from '../../dominio/estadoAcceso';
 import { Cargando, FilasEsqueleto, InsigniaEstado, Kpi, Tarjeta, Vacio } from '../componentes/ui';
-import { BarrasHorizontales, Dona, Leyenda } from '../componentes/Graficos';
+import { BarrasApiladas, Dona } from '../componentes/Graficos';
 import { PlacaFoto, RegistroManualModal } from '../componentes/deteccion';
 import { CeldaIngreso, actualizarCampoIngreso, type CampoIngreso } from '../componentes/CeldaIngreso';
 import { ConfianzaRegistro } from '../componentes/ConfianzaRegistro';
@@ -168,18 +168,17 @@ const DistribucionHoy: React.FC<{ r: ResumenPanel }> = ({ r }) => (
   </Tarjeta>
 );
 
-/** Barras horizontales: ingresos de cada uno de los últimos 7 días, del más reciente al más antiguo. */
+const SERIE_TOTAL_DIARIO = [{ clave: 'total', etiqueta: 'Ingresos', color: 'var(--accent-blue)' }] as const;
+
+/** Una barra por día, con el total de ingresos en orden cronológico. */
 const UltimosSieteDias: React.FC<{ r: ResumenPanel }> = ({ r }) => {
   const total = r.tendencia.reduce((s, d) => s + d.total, 0);
   return (
     <Tarjeta titulo="Ingresos por día" subtitulo={`Últimos 7 días · ${numero(total)} ingresos`}>
-      {total === 0 ? <Vacio titulo="Sin ingresos en los últimos 7 días" icono={<Activity size={22} />} /> : (
-        <div className="pila" style={{ gap: 14 }}>
-          <BarrasHorizontales series={SERIES_ESTADO}
-            filas={[...r.tendencia].reverse().map(d => ({ etiqueta: diaCorto(d.fecha), total: d.total, valores: d }))} />
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}><Leyenda series={SERIES_ESTADO} /></div>
-        </div>
-      )}
+      {r.tendencia.length ? (
+        <BarrasApiladas datos={r.tendencia} series={SERIE_TOTAL_DIARIO} etiquetaX={d => diaCorto(d.fecha)}
+          tituloTip={d => fecha(d.fecha)} ejes={{ x: 'Días', y: 'Ingresos' }} mostrarTotales alto={280} />
+      ) : <Vacio titulo="Sin ingresos en los últimos 7 días" icono={<Activity size={22} />} />}
     </Tarjeta>
   );
 };

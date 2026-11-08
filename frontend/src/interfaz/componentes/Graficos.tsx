@@ -49,7 +49,9 @@ const Tooltip: React.FC<{ tip: Tip | null }> = ({ tip }) => {
       {tip.filas.map(f => (
         <div className="fila-tt" key={f.etiqueta}><span><i style={{ background: f.color }} /> {f.etiqueta}</span><b>{numero(f.valor)}</b></div>
       ))}
-      <div className="fila-tt" style={{ borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: 4, paddingTop: 4 }}><span>Total</span><b>{numero(tip.total)}</b></div>
+      {tip.filas.length > 1 && (
+        <div className="fila-tt" style={{ borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: 4, paddingTop: 4 }}><span>Total</span><b>{numero(tip.total)}</b></div>
+      )}
     </div>
   );
 };
@@ -63,7 +65,7 @@ function rectSuperiorRedondeado(x: number, y: number, w: number, h: number, r: n
 /** Conteo de una serie en una fila (0 si falta). */
 const conteo = (fila: object, clave: string) => Number((fila as Record<string, unknown>)[clave] || 0);
 
-export function BarrasApiladas<T extends object>({ datos, series, etiquetaX, tituloTip, alto = 220, cadaEtiqueta = 1, resaltar }: {
+export function BarrasApiladas<T extends object>({ datos, series, etiquetaX, tituloTip, alto = 220, cadaEtiqueta = 1, resaltar, ejes, mostrarTotales }: {
   datos: T[];
   series: readonly Serie[];
   etiquetaX: (d: T, i: number) => string;
@@ -71,14 +73,19 @@ export function BarrasApiladas<T extends object>({ datos, series, etiquetaX, tit
   alto?: number;
   cadaEtiqueta?: number;
   resaltar?: number;
+  ejes?: { x: string; y: string };
+  mostrarTotales?: boolean;
 }) {
   const [ref, ancho] = useAncho<HTMLDivElement>();
   const [tip, setTip] = useState<Tip | null>(null);
   const [hover, setHover] = useState<number | null>(null);
-  const margen = { izq: 34, der: 6, sup: 8, inf: 24 };
   const totales = datos.map(d => series.reduce((s, x) => s + conteo(d, x.clave), 0));
   const marcas = escala(Math.max(...totales, 0));
   const maxEje = marcas[marcas.length - 1] || 1;
+  const margen = {
+    izq: Math.max(34, numero(maxEje).length * 7 + 8), der: 6,
+    sup: ejes ? 32 : mostrarTotales ? 20 : 8, inf: ejes ? 42 : 24,
+  };
   const w = Math.max(0, ancho - margen.izq - margen.der);
   const h = alto - margen.sup - margen.inf;
   const banda = datos.length ? w / datos.length : 0;
@@ -90,7 +97,10 @@ export function BarrasApiladas<T extends object>({ datos, series, etiquetaX, tit
       {ancho > 0 && (
         // viewBox: al imprimir el gráfico se ajusta al ancho de la hoja
         <svg className="grafico" width={ancho} height={alto} viewBox={`0 0 ${ancho} ${alto}`} role="img"
-          aria-label={series.length > 1 ? 'Gráfico de barras por estado' : `Gráfico de barras: ${series[0]?.etiqueta ?? ''}`}>
+          aria-label={ejes ? `Gráfico de barras con ${ejes.x.toLowerCase()} en el eje X y ${ejes.y.toLowerCase()} en el eje Y`
+            : series.length > 1 ? 'Gráfico de barras por estado' : `Gráfico de barras: ${series[0]?.etiqueta ?? ''}`}>
+          {mostrarTotales && <desc>{datos.map((d, i) => `${(tituloTip ?? etiquetaX)(d, i)}, ${numero(totales[i])}`).join('. ')}</desc>}
+          {ejes && <text x={margen.izq} y={12} fontWeight={600}>{ejes.y}</text>}
           {marcas.map(m => (
             <g key={m}>
               <line className="rejilla" x1={margen.izq} x2={ancho - margen.der} y1={y(m)} y2={y(m)} />
@@ -98,7 +108,9 @@ export function BarrasApiladas<T extends object>({ datos, series, etiquetaX, tit
             </g>
           ))}
           {datos.map((d, i) => {
-            const x0 = margen.izq + i * banda + (banda - anchoBarra) / 2;
+            const centro = margen.izq + (i + 0.5) * banda;
+            const x0 = centro - anchoBarra / 2;
+            const total = numero(totales[i]);
             let acumulado = 0;
             const visibles = series.filter(s => conteo(d, s.clave) > 0);
             return (
@@ -116,6 +128,9 @@ export function BarrasApiladas<T extends object>({ datos, series, etiquetaX, tit
                     ? <path key={s.clave} d={rectSuperiorRedondeado(x0, yTop, anchoBarra, alt, 4)} fill={s.color} />
                     : <rect key={s.clave} x={x0} y={yTop + 2} width={anchoBarra} height={alt} fill={s.color} />;
                 })}
+                {mostrarTotales && banda >= total.length * 7 + 4 && (
+                  <text x={centro} y={y(totales[i]) - 6} textAnchor="middle" fontWeight={600}>{total}</text>
+                )}
                 {/* Zona de interacción más grande que la barra */}
                 <rect x={margen.izq + i * banda} y={margen.sup} width={banda} height={h} fill="transparent"
                   onMouseMove={e => {
@@ -126,46 +141,22 @@ export function BarrasApiladas<T extends object>({ datos, series, etiquetaX, tit
                     });
                   }} />
                 {i % cadaEtiqueta === 0 && (
-                  <text x={margen.izq + i * banda + banda / 2} y={alto - 6} textAnchor="middle">{etiquetaX(d, i)}</text>
+                  <text x={centro} y={y(0) + 18} textAnchor="middle">{etiquetaX(d, i)}</text>
                 )}
               </g>
             );
           })}
           <line className="eje" x1={margen.izq} x2={ancho - margen.der} y1={y(0)} y2={y(0)} />
+          {ejes && <>
+            <line className="eje" x1={margen.izq} x2={margen.izq} y1={y(maxEje)} y2={y(0)} />
+            <text x={margen.izq + w / 2} y={alto - 6} textAnchor="middle" fontWeight={600}>{ejes.x}</text>
+          </>}
         </svg>
       )}
       <Tooltip tip={tip} />
     </div>
   );
 }
-
-/** Barras horizontales (ranking por categoría), opcionalmente apiladas por estado. */
-export const BarrasHorizontales: React.FC<{
-  filas: { etiqueta: string; valores: object; total: number }[];
-  series: readonly Serie[];
-}> = ({ filas, series }) => {
-  const max = Math.max(1, ...filas.map(f => f.total));
-  const [tip, setTip] = useState<Tip | null>(null);
-  return (
-    <div className="pila" style={{ gap: 10 }} onMouseLeave={() => setTip(null)}>
-      {filas.map(f => (
-        <div className="barra-h" key={f.etiqueta}
-          onMouseMove={e => setTip({ x: e.clientX, y: e.clientY, titulo: f.etiqueta, total: f.total,
-            filas: series.map(s => ({ etiqueta: s.etiqueta, color: s.color, valor: conteo(f.valores, s.clave) })) })}>
-          <span className="truncar" title={f.etiqueta}>{f.etiqueta}</span>
-          <div className="pista">
-            {series.map(s => {
-              const v = conteo(f.valores, s.clave);
-              return v > 0 ? <div key={s.clave} style={{ width: `${(v / max) * 100}%`, background: s.color }} /> : null;
-            })}
-          </div>
-          <span className="valor">{numero(f.total)}</span>
-        </div>
-      ))}
-      <Tooltip tip={tip} />
-    </div>
-  );
-};
 
 /**
  * Dona de una distribución (como el panel de vigilance-heart): porcentaje junto a cada segmento,
