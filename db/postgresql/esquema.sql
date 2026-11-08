@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS "listanegra" (
   nivel_alerta varchar(20) DEFAULT 'ALTA' CHECK (nivel_alerta IN ('MEDIA','ALTA','CRITICA')),
   fecha_registro timestamp DEFAULT CURRENT_TIMESTAMP, activo boolean DEFAULT true,
   tipo_vehiculo varchar(50), marca varchar(50), modelo varchar(50), color varchar(30),
+  institucion varchar(150), cargo varchar(150),
   registrado_por integer REFERENCES "usuarios"(id), fecha_actualizacion timestamp,
   fecha_vencimiento date, fecha_inicio date, horario varchar(600), observaciones varchar(255),
   ruta_evidencia_vehiculo varchar(500), ruta_evidencia_placa varchar(500),

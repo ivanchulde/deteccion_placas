@@ -12,7 +12,7 @@ export const ROLES_ORDEN: Rol[] = ['Guardia', 'GestorPermisos', 'Admin'];
 
 export type Permiso =
   | 'operacion:monitorear' | 'detecciones:validar' | 'detecciones:gestionar' | 'detecciones:eliminar-individual' | 'detecciones:eliminar'
-  | 'listas:ver' | 'padron:agregar' | 'padron:gestionar' | 'padron:supervisar' | 'alertas:restringir' | 'alertas:gestionar' | 'accesos:excepcion'
+  | 'listas:ver' | 'listas:editar-ficha' | 'padron:agregar' | 'padron:gestionar' | 'padron:supervisar' | 'alertas:restringir' | 'alertas:gestionar' | 'accesos:excepcion'
   | 'solicitudes:crear' | 'solicitudes:resolver'
   | 'avisos:garita' | 'avisos:acceso' | 'avisos:seguridad' | 'avisos:sistema' | 'avisos:padron' | 'alarmas:escalamiento'
   | 'reportes:ver'
@@ -34,6 +34,7 @@ export const ETIQUETA_PERMISO: Record<Permiso, string> = {
   'detecciones:eliminar-individual': 'Eliminar un registro y su evidencia con motivo auditado',
   'detecciones:eliminar': 'Eliminar múltiples registros y su evidencia',
   'listas:ver': 'Consultar la lista blanca y la lista negra',
+  'listas:editar-ficha': 'Editar institución y cargo en la lista blanca y la lista negra',
   'padron:agregar': 'Agregar vehículos a la lista blanca',
   'padron:gestionar': 'Editar y retirar permisos de la lista blanca: vigencia, horarios y categoría',
   'padron:supervisar': 'Consultar y gestionar los permisos otorgados por todos los usuarios, incluidos los retirados',
@@ -59,6 +60,6 @@ export const ETIQUETA_PERMISO: Record<Permiso, string> = {
 
 export const DESCRIPCION_ROL: Record<Rol, string> = {
   Guardia: 'Monitorea el punto de control en tiempo real, administra las listas, autoriza los ingresos y solicita permisos. Recibe la notificación de cada permiso otorgado.',
-  GestorPermisos: 'Registra y administra la lista blanca de vehículos autorizados y resuelve las solicitudes de acceso desde una sola vista, sin Gestión de Accesos. Solo se le notifica la llegada de los vehículos a los que dio permiso.',
+  GestorPermisos: 'Registra y administra sus permisos de la lista blanca desde una sola vista, sin recibir solicitudes de acceso ni operar la garita. Solo se le notifica la llegada de los vehículos a los que dio permiso.',
   Admin: 'Control total: usuarios, cámaras, configuración, auditoría, lista negra y todas las funciones operativas.',
 };

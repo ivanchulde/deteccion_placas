@@ -25,7 +25,7 @@ export interface DatosIniciales {
 }
 
 /**
- * Solicitud de autorización de una placa (guardia): el gestor de permisos la
+ * Solicitud de autorización de una placa (guardia): el administrador la
  * recibe como notificación y decide. Se abre desde el aviso de vehículo no autorizado, el
  * detalle de un ingreso o la pantalla de solicitudes. Con `solicitud` edita una solicitud propia
  * pendiente (PUT, mismo cuerpo que el alta): la API rechaza la edición si ya fue resuelta.
@@ -87,8 +87,8 @@ export const FormularioSolicitud: React.FC<{
   return (
     <Modal titulo={solicitud ? <>Editar solicitud #{solicitud.id}</> : 'Solicitar autorización de ingreso'}
       subtitulo={solicitud
-        ? 'Puede corregirla mientras esté pendiente. El gestor de permisos verá los datos actualizados.'
-        : 'El gestor de permisos recibirá la solicitud de inmediato y decidirá si concede el permiso.'}
+        ? 'Puede corregirla mientras esté pendiente. El administrador verá los datos actualizados.'
+        : 'El administrador recibirá la solicitud de inmediato y decidirá si concede el permiso.'}
       onCerrar={onCerrar} bloquear={enviando} tamano="panoramico"
       pie={<>
         <button className="btn btn-secondary" onClick={onCerrar} disabled={enviando}>Cancelar</button>
@@ -109,10 +109,9 @@ export const FormularioSolicitud: React.FC<{
 };
 
 /**
- * Aprobación por el gestor de permisos: puede ajustar categoría, vigencia y horario antes de
+ * Aprobación por el administrador: puede ajustar categoría, vigencia y horario antes de
  * conceder el permiso y, si la solicitud nació de un ingreso y tiene detecciones:validar (Admin),
- * validarlo en el mismo paso. El gestor de permisos no valida ingresos: lo hace la garita al
- * recibir la resolución.
+ * validarlo en el mismo paso.
  */
 export const AprobarSolicitud: React.FC<{ s: SolicitudAcceso; onCerrar: () => void; onAprobada: (mensaje: string) => void }> = ({ s, onCerrar, onAprobada }) => {
   const [a, setA] = useState({ categoria: s.categoria, propietario: s.propietario, cedula: s.cedula ?? '', institucion: s.institucion ?? '', cargo: s.cargo ?? '', departamento: s.departamento ?? '',
@@ -142,7 +141,7 @@ export const AprobarSolicitud: React.FC<{ s: SolicitudAcceso; onCerrar: () => vo
       const r = await api.post(`/solicitudes-acceso/${s.id}/aprobar`, {
         comentario: a.comentario.trim() || undefined,
         ajustes: { ...a, fecha_inicio: a.fecha_inicio || null, fecha_fin: a.fecha_fin || null, horario },
-        // Lo que el gestor revisó: si el solicitante la editó mientras tanto, la API no la aprueba (409)
+        // Lo que el administrador revisó: si el solicitante la editó mientras tanto, la API no la aprueba (409)
         version: s.version,
       });
       let mensaje: string = r.data.message;

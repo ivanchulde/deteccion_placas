@@ -43,13 +43,42 @@ const CAMPOS_VEHICULO: CampoLista[] = [
   { nombre: 'observaciones', etiqueta: 'Observaciones', tipo: 'libre', max: 255 },
 ];
 
+/** Datos descriptivos que la garita puede corregir sin cambiar el permiso o la alerta. */
+export const CAMPOS_FICHA_LISTA: CampoLista[] = [
+  { nombre: 'institucion', etiqueta: 'Institución', tipo: 'alfanumerico', max: 150 },
+  { nombre: 'cargo', etiqueta: 'Cargo', tipo: 'alfanumerico', max: 150 },
+];
+
+export interface FichaLista {
+  institucion: string | null;
+  cargo: string | null;
+}
+
+/** El PATCH de ficha admite exactamente ambos textos; un texto vacío limpia el dato. */
+export function leerFichaLista(entrada: unknown): Validado<FichaLista> {
+  if (!entrada || typeof entrada !== 'object' || Array.isArray(entrada)) {
+    return { ok: false, error: 'La ficha debe contener únicamente institución y cargo como textos.' };
+  }
+  const body = entrada as Record<string, unknown>;
+  if (Object.keys(body).length !== 2 || Object.keys(body).some(k => k !== 'institucion' && k !== 'cargo')
+    || typeof body.institucion !== 'string' || typeof body.cargo !== 'string') {
+    return { ok: false, error: 'La ficha debe contener únicamente institución y cargo como textos.' };
+  }
+  const valor: FichaLista = { institucion: null, cargo: null };
+  for (const campo of CAMPOS_FICHA_LISTA) {
+    const r = validarTexto(body[campo.nombre], campo);
+    if (!r.ok) return r;
+    valor[campo.nombre as keyof FichaLista] = r.valor;
+  }
+  return { ok: true, valor };
+}
+
 export const LISTA_BLANCA: DefinicionLista = {
   tipo: 'autorizados', entidad: 'autorizado', nombre: 'lista blanca', temporal: true, permisoEdicion: 'padron:gestionar',
   campos: [
     { nombre: 'propietario', etiqueta: 'Propietario o responsable', tipo: 'nombre', max: 150, min: 3, requerido: true },
     { nombre: 'cedula', etiqueta: 'Cédula', tipo: 'libre', max: 10 },
-    { nombre: 'institucion', etiqueta: 'Institución', tipo: 'alfanumerico', max: 150 },
-    { nombre: 'cargo', etiqueta: 'Cargo', tipo: 'alfanumerico', max: 150 },
+    ...CAMPOS_FICHA_LISTA,
     { nombre: 'departamento', etiqueta: 'Departamento', tipo: 'alfanumerico', max: 100 },
     { nombre: 'categoria', etiqueta: 'Categoría', tipo: 'letras', max: 20, valores: CATEGORIAS_PERMISO, omision: 'FUNCIONARIO' },
     // Motivo habitual (trabajo, proveedor, visita…): cada ingreso del vehículo lo toma sin reescribirlo
@@ -63,6 +92,7 @@ export const LISTA_NEGRA: DefinicionLista = {
   campos: [
     { nombre: 'motivo', etiqueta: 'Motivo', tipo: 'libre', max: 255, min: 5, requerido: true },
     { nombre: 'nivel_alerta', etiqueta: 'Nivel', tipo: 'letras', max: 20, requerido: true, valores: NIVELES_ALERTA },
+    ...CAMPOS_FICHA_LISTA,
     ...CAMPOS_VEHICULO,
   ],
 };

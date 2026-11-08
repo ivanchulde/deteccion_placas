@@ -1,6 +1,6 @@
 import type { Actor } from './comun';
 import type { CalendarioLocal } from './calendario';
-import { ROL_POR_CODIGO, ROLES } from '../dominio/permisos';
+import { ROL_POR_CODIGO, ROLES, tienePermiso, type Rol } from '../dominio/permisos';
 
 /**
  * Casos de uso del panel de inicio (solo lectura). Los indicadores se calculan en la base con
@@ -56,6 +56,7 @@ export interface DatosOperacion {
 }
 
 export interface ParametrosAccesos {
+  incluirSolicitudes: boolean;
   hoy: Date;
   hace7: Date;
   diasAviso: number;
@@ -165,17 +166,20 @@ export function casosPanel(d: DependenciasPanel) {
     async accesos(actor: Actor) {
       const ahora = d.tiempo.ahora();
       const diasAviso = d.diasAviso();
+      const incluirSolicitudes = tienePermiso(actor.rol as Rol, 'solicitudes:resolver');
       const r = await d.repositorio.accesos({
+        incluirSolicitudes,
         hoy: d.tiempo.inicioDiaLocal(ahora),
         hace7: d.tiempo.inicioDiaLocal(ahora, -6),
         diasAviso,
         usuarioId: actor.id,
       });
+      const solicitudes = incluirSolicitudes ? r.solicitudes : [];
       return {
         generado: ahora,
         solicitudes: {
-          pendientes: Number(r.solicitudes[0]?.total ?? 0),
-          ultimas: r.solicitudes.map(({ total: _total, ...s }) => s),
+          pendientes: Number(solicitudes[0]?.total ?? 0),
+          ultimas: solicitudes.map(({ total: _total, ...s }) => s),
         },
         padron: { ...cero(r.padron), dias_aviso: diasAviso },
         categorias: Object.fromEntries(r.categorias.map(c => [c.categoria, Number(c.n)])),

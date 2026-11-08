@@ -482,6 +482,8 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
   const [motivo, setMotivo] = useState('');
   const [tipoVehiculo, setTipoVehiculo] = useState('');
   const [marca, setMarca] = useState('');
+  const [institucion, setInstitucion] = useState('');
+  const [cargo, setCargo] = useState('');
   const [camara, setCamara] = useState('');
   const [camaras, setCamaras] = useState<Camara[]>([]);
   const [enviando, setEnviando] = useState(false);
@@ -502,7 +504,7 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
   }, []);
   const valido = (!placa.trim() || validarPlaca(placa).ok) && validarTexto(motivo, REGLA_MOTIVO_MANUAL).ok
     && validarTexto(tipoVehiculo, REGLAS_VEHICULO.tipo_vehiculo).ok && validarTexto(marca, REGLAS_VEHICULO.marca).ok
-    && (!esIngreso || datosIngresoValidos(ingreso));
+    && (!esIngreso || (datosIngresoValidos(ingreso) && validarTexto(institucion, REGLAS_LISTA_BLANCA.institucion).ok && validarTexto(cargo, REGLAS_LISTA_BLANCA.cargo).ok));
 
   const guardar = async () => {
     setEnviando(true);
@@ -510,7 +512,7 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
     try {
       const r = await api.post('/detecciones/registro-manual', {
         placa: placa.trim() || null, motivo: motivo.trim(), camara_id: camara ? Number(camara) : undefined, ...(esIngreso ? cuerpoIngreso(ingreso) : {}),
-        ...(esIngreso ? { tipo_vehiculo: tipoVehiculo, marca } : {}),
+        ...(esIngreso ? { tipo_vehiculo: tipoVehiculo, marca, ...(institucion.trim() ? { institucion: institucion.trim() } : {}), ...(cargo.trim() ? { cargo: cargo.trim() } : {}) } : {}),
         ...(camara && foto !== null ? { cuadro_t: foto } : {}),
       });
       const d: Deteccion = r.data.deteccion;
@@ -566,7 +568,11 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
             ))}
           </div>
         </div>
-        {esIngreso && <CamposIngreso id="man" valor={ingreso} onCambiar={setIngreso} />}
+        {esIngreso && <>
+          <CamposIngreso id="man" valor={ingreso} onCambiar={setIngreso} />
+          <CampoTexto id="man-institucion" etiqueta="Institución" valor={institucion} onCambiar={setInstitucion} regla={REGLAS_LISTA_BLANCA.institucion} placeholder="Ej.: ECU 911" />
+          <CampoTexto id="man-cargo" etiqueta="Cargo" valor={cargo} onCambiar={setCargo} regla={REGLAS_LISTA_BLANCA.cargo} placeholder="Ej.: Agente de seguridad" />
+        </>}
           </div>
         </section>
         <div className="completo"><AvisoFlotante tipo="info">{camaraSeleccionada?.direccion === 'salida'

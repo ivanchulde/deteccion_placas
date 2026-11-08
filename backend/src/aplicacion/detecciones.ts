@@ -847,9 +847,10 @@ export function casosDetecciones(d: DependenciasDetecciones) {
     async registroManual(entrada: unknown, actor: Actor) {
       const r = leerRegistroManual(cuerpo(entrada));
       if (!r.ok) throw errorValidacion(r.error);
-      const { placa, motivo, camaraId, tipoVehiculo, marca, cuadroT } = r.valor;
+      const { placa, motivo, camaraId, tipoVehiculo, marca, cuadroT, ficha } = r.valor;
       const ingreso = leerDatosIngreso(cuerpo(entrada));
       if (!ingreso.ok) throw errorValidacion(ingreso.error);
+      if (ficha) ingreso.valor.ficha = { ...ingreso.valor.ficha, ...ficha };
       const direccion = camaraId === null ? 'ingreso' : await d.repositorio.direccionCamara(camaraId);
       if (direccion === null) throw errorValidacion('La cámara seleccionada no existe o no tiene una dirección válida.');
       // Foto elegida de los últimos 30 s de la cámara: se guarda antes de crear el registro

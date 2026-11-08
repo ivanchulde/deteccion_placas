@@ -86,7 +86,7 @@ const Sidebar: React.FC<{ colapsado: boolean; onColapsar: () => void; abiertoMov
       : [...actual, c]));
     useEvento<{ id: number }>('camara:eliminada', ({ id }) => setCamaras(actual => actual.filter(c => c.id !== id)));
     const revision = useColaRevision(!!user && puede('operacion:monitorear'));
-    const solicitudes = useSolicitudesPendientes(!!user && puede('solicitudes:resolver'));
+    const solicitudes = useSolicitudesPendientes(!!user && user.rol !== 'GestorPermisos' && puede('solicitudes:resolver'));
     if (!user) return null;
     const contadores = { revision, solicitudes };
     return (

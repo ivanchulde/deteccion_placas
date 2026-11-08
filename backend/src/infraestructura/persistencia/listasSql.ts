@@ -1,7 +1,7 @@
 import sql, { PostgresRequest } from '../postgres';
 import { getDB } from '../db';
 import { describirHorario, leerHorario } from '../../dominio/horario';
-import { type DefinicionLista, LISTA_BLANCA, type RegistroLista, type TipoLista } from '../../dominio/listas';
+import { type DefinicionLista, type FichaLista, LISTA_BLANCA, type RegistroLista, type TipoLista } from '../../dominio/listas';
 import type { RegistroListaDTO, RepositorioListas } from '../../aplicacion/listas';
 import { config } from '../servicios/configuracion';
 import { hoyLocalSql } from '../servicios/tiempo';
@@ -135,6 +135,17 @@ export const repositorioListasSql: RepositorioListas = {
         placa = @placa, fecha_vencimiento = @vence, fecha_actualizacion = SYSDATETIME(),
         ${columnasDe(def).map(c => `${c} = ${valorDe(c)}`).join(', ')}
       WHERE id = @id`);
+  },
+
+  async actualizarFicha(def, id, ficha: FichaLista) {
+    const r = await db().request()
+      .input('id', sql.Int, id)
+      .input('institucion', sql.NVarChar(150), ficha.institucion)
+      .input('cargo', sql.NVarChar(150), ficha.cargo)
+      .query(`UPDATE ${TABLA[def.tipo]}
+        SET institucion = @institucion, cargo = @cargo, fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = @id AND activo = 1 RETURNING id`);
+    return r.recordset.length > 0;
   },
 
   async retirar(def, id) {

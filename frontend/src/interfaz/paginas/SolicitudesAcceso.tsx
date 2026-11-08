@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Check, Clock, Edit3, Plus, ShieldCheck, Undo2, X } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
 import { useAuth } from '../../aplicacion/AuthContext';
+import { esVistaGestionPermisos } from '../../dominio/permisos';
 import { useEvento, useReconexion } from '../../aplicacion/tiempoReal';
 import { useConsulta, useDiferido } from '../../aplicacion/hooks';
 import type { EstadoSolicitud, SolicitudAcceso } from '../../dominio/tipos';
@@ -14,6 +15,7 @@ import { AprobarSolicitud, FormularioSolicitud } from '../componentes/Formulario
 import { useNotificar } from '../componentes/Notificaciones';
 import Listas from './Listas';
 import PermisosUsuarios from './PermisosUsuarios';
+import GestionPermisos from './GestionPermisos';
 
 type Vista = 'pendiente' | 'resueltas' | 'todas';
 
@@ -26,7 +28,7 @@ const ESTADO: Record<EstadoSolicitud, { etiqueta: string; clase: string }> = {
 
 /**
  * Solicitudes de acceso. El personal ve las suyas y, mientras están pendientes, las edita o
- * cancela; el gestor de permisos (y quien tenga solicitudes:resolver) ve todas y las aprueba o
+ * cancela; el administrador (solicitudes:resolver) ve todas y las aprueba o
  * rechaza. Nadie resuelve las propias (separación de funciones, aplicada también por la API).
  */
 const ListaSolicitudesAcceso: React.FC<{ incrustada?: boolean; onVerPadron?: () => void }> = ({ incrustada, onVerPadron }) => {
@@ -63,12 +65,11 @@ const ListaSolicitudesAcceso: React.FC<{ incrustada?: boolean; onVerPadron?: () 
     <div className={incrustada ? undefined : 'pagina'}>
       <div className="pila">
         <AvisoFlotante tipo="info">
-          {/* El gestor de permisos solo entrega permisos: las solicitudes las envían la garita y el administrador */}
           {resuelve && !crea
             ? <>Aquí llegan las solicitudes que envían la <b>garita</b> y el <b>administrador</b>. Revise cada una y entregue el permiso con la vigencia y el horario adecuados, o recházela.</>
             : resuelve
               ? <>Revise cada solicitud y conceda un permiso con la vigencia y el horario adecuados. Por <b>separación de funciones</b>, no puede resolver las solicitudes que usted registró.</>
-              : <>Sus solicitudes llegan al <b>gestor de permisos</b> como notificación. Recibirá otra notificación cuando sean resueltas.</>}
+              : <>Sus solicitudes llegan al <b>administrador</b> como notificación. Recibirá otra notificación cuando sean resueltas.</>}
         </AvisoFlotante>
         {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}
         <Tarjeta titulo={resuelve && !crea ? 'Solicitudes por resolver' : resuelve ? 'Solicitudes de acceso' : 'Mis solicitudes de acceso'}
@@ -130,9 +131,9 @@ const ListaSolicitudesAcceso: React.FC<{ incrustada?: boolean; onVerPadron?: () 
       </div>
 
       {nueva && <FormularioSolicitud onCerrar={() => setNueva(false)}
-        onEnviada={s => { setNueva(false); notificar('exito', `Solicitud #${s.id} enviada`, 'El gestor de permisos fue notificado.'); recargar(true); }} />}
+        onEnviada={s => { setNueva(false); notificar('exito', `Solicitud #${s.id} enviada`, 'El administrador fue notificado.'); recargar(true); }} />}
       {editando && <FormularioSolicitud solicitud={editando} onCerrar={() => setEditando(null)}
-        onEnviada={s => { setEditando(null); notificar('exito', `Solicitud #${s.id} actualizada`, 'El gestor de permisos verá los datos actualizados.'); recargar(true); }} />}
+        onEnviada={s => { setEditando(null); notificar('exito', `Solicitud #${s.id} actualizada`, 'El administrador verá los datos actualizados.'); recargar(true); }} />}
       {aprobando && <AprobarSolicitud s={aprobando} onCerrar={() => setAprobando(null)}
         onAprobada={m => { setAprobando(null); notificar('exito', `Solicitud #${aprobando.id} aprobada`, m); recargar(true); }} />}
       {rechazando && (
@@ -176,6 +177,7 @@ const SolicitudesAdministrador: React.FC = () => {
 const SolicitudesAcceso: React.FC<{ incrustada?: boolean; onVerPadron?: () => void }> = props => {
   const { puede } = useAuth();
   const [params, setParams] = useSearchParams();
+  if (esVistaGestionPermisos(puede)) return <GestionPermisos />;
   if (!props.incrustada && puede('padron:supervisar')) return <SolicitudesAdministrador />;
   const consultaPermisos = !props.incrustada && puede('listas:ver') && !puede('solicitudes:resolver');
   if (!consultaPermisos) return <ListaSolicitudesAcceso {...props} />;

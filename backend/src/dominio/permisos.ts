@@ -41,6 +41,7 @@ export const PERMISOS = {
   'detecciones:eliminar': 'Eliminar múltiples registros y su evidencia',
   // Listas de control
   'listas:ver': 'Consultar el padrón de autorizados y la lista de alertas',
+  'listas:editar-ficha': 'Corregir únicamente institución y cargo en las listas blanca y negra',
   'padron:agregar': 'Agregar vehículos a la lista blanca, también al confirmar una lectura',
   'padron:gestionar': 'Edición, retiro e importación de permisos de placa (vigencias, horarios, categoría)',
   'padron:supervisar': 'Consultar y gestionar los permisos otorgados por todos los usuarios, incluidos los retirados',
@@ -73,18 +74,18 @@ export type Permiso = keyof typeof PERMISOS;
 /** Matriz rol → permisos. */
 export const MATRIZ: Record<Rol, readonly Permiso[]> = {
   // Punto de control: monitorea, valida lecturas, consulta las listas y solicita accesos. Agrega placas a
-  // las listas desde la garita, pero no las edita ni las quita: una sola persona no puede sacar una placa
-  // de la lista negra ni cambiar un permiso.
+  // las listas desde la garita y corrige institución/cargo, pero no las quita ni cambia la
+  // autorización, vigencia o condiciones de una placa.
   // Recibe los avisos de garita y la notificación de cada permiso otorgado.
   Guardia: [
-    'operacion:monitorear', 'detecciones:validar', 'detecciones:eliminar-individual', 'listas:ver', 'padron:agregar', 'solicitudes:crear', 'alertas:restringir',
+    'operacion:monitorear', 'detecciones:validar', 'detecciones:eliminar-individual', 'listas:ver', 'listas:editar-ficha', 'padron:agregar', 'solicitudes:crear', 'alertas:restringir',
     'avisos:garita', 'avisos:acceso', 'avisos:seguridad', 'avisos:padron',
   ],
-  // Una sola vista (gestión de permisos), sin monitoreo: concede permisos de placa y resuelve
-  // solicitudes. Solo se le notifica la llegada de los vehículos a los que dio permiso
+  // Una sola vista (gestión de permisos), sin monitoreo: concede permisos de placa.
+  // Solo se le notifica la llegada de los vehículos a los que dio permiso
   // (destinatario explícito, ver infraestructura/servicios/avisosAcceso.ts), no los avisos de monitoreo.
   GestorPermisos: [
-    'listas:ver', 'padron:agregar', 'padron:gestionar', 'solicitudes:resolver',
+    'listas:ver', 'padron:agregar', 'padron:gestionar',
   ],
   Admin: Object.keys(PERMISOS) as Permiso[],
 };

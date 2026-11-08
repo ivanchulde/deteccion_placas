@@ -91,7 +91,7 @@ export const FormularioLista: React.FC<{
         horario, observaciones: f.observaciones, motivo_ingreso: f.motivo_ingreso,
       }
       : {
-        placa, motivo: f.motivo, nivel_alerta: f.nivel_alerta, tipo_vehiculo: f.tipo_vehiculo,
+        placa, institucion: f.institucion, cargo: f.cargo, motivo: f.motivo, nivel_alerta: f.nivel_alerta, tipo_vehiculo: f.tipo_vehiculo,
         marca: f.marca, modelo: f.modelo, color: f.color, fecha_inicio: f.fecha_inicio || null,
         fecha_vencimiento: f.fecha_vencimiento || null, horario, observaciones: f.observaciones,
       };
@@ -125,6 +125,8 @@ export const FormularioLista: React.FC<{
                 <CampoPlaca id="l-placa" etiqueta="Placa (opcional)" valor={f.placa} onCambiar={poner('placa')} requerido={false} autoFocus={!deteccion}
                   ayuda="Puede guardar la alerta sin placa y completarla cuando sea identificada." />
                 <div className="campo"><label htmlFor="l-nivel">Nivel de alerta*</label><select id="l-nivel" className="select" value={f.nivel_alerta} onChange={campo('nivel_alerta')}><option value="CRITICA">Crítica</option><option value="ALTA">Alta</option><option value="MEDIA">Media</option></select></div>
+                <CampoTexto id="l-institucion" etiqueta="Institución" valor={f.institucion} onCambiar={poner('institucion')} regla={REGLAS_LISTA_NEGRA.institucion} placeholder="Ej.: ECU 911" />
+                <CampoTexto id="l-cargo" etiqueta="Cargo" valor={f.cargo} onCambiar={poner('cargo')} regla={REGLAS_LISTA_NEGRA.cargo} placeholder="Ej.: Agente de seguridad" />
                 <CampoTexto id="l-motivo" className="completo" etiqueta="Motivo*" valor={f.motivo} onCambiar={poner('motivo')} regla={REGLAS_LISTA_NEGRA.motivo} />
                 <CampoTexto id="l-obs" className="completo" etiqueta="Observaciones" valor={f.observaciones} onCambiar={poner('observaciones')} regla={REGLA_OBSERVACIONES} multilinea />
               </div>

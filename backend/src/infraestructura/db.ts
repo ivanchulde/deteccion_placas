@@ -78,6 +78,7 @@ async function initDatabaseSchema(): Promise<void> {
   await pool.query(migracion('migracion_renombrar_lista_blanca.sql'));
   await pool.query(ddl);
   await pool.query(migracion('migracion_campos_permisos.sql'));
+  await pool.query(migracion('migracion_ficha_listas.sql'));
   await pool.query(migracion('migracion_evidencias_listas.sql'));
   // Formulario «Autorizar ingreso»: del JSON datos_permiso a una columna por campo
   await pool.query(migracion('migracion_ficha_ingreso_columnas.sql'));

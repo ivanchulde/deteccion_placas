@@ -81,8 +81,13 @@ const HORARIO: CampoDoc = {
   ejemplo: [{ dias: [1, 2, 3, 4, 5], desde: '07:00', hasta: '18:00' }],
 };
 const CATEGORIAS = ['FUNCIONARIO', 'VISITANTE', 'PROVEEDOR', 'CONTRATISTA', 'OFICIAL', 'EMERGENCIA'];
+const FICHA_LISTA: Record<string, CampoDoc> = {
+  institucion: { tipo: 'string', descripcion: 'Institución: letras, números, espacios y . , / # ( ) -; máximo 150 caracteres. Vacío limpia el dato.', ejemplo: 'ECU 911' },
+  cargo: { tipo: 'string', descripcion: 'Cargo: letras, números, espacios y . , / # ( ) -; máximo 150 caracteres. Vacío limpia el dato.', ejemplo: 'Analista' },
+};
 
 const CUERPO_AUTORIZADO: Record<string, CampoDoc> = {
+  ...FICHA_LISTA,
   placa: PLACA_LISTA,
   propietario: { tipo: 'string', descripcion: 'Propietario o responsable (máx. 150)', requerido: true, ejemplo: 'Juan Pérez' },
   departamento: { tipo: 'string', descripcion: 'Departamento (máx. 100)', ejemplo: 'Sala de operaciones' },
@@ -95,6 +100,7 @@ const CUERPO_AUTORIZADO: Record<string, CampoDoc> = {
 };
 
 const CUERPO_ALERTA: Record<string, CampoDoc> = {
+  ...FICHA_LISTA,
   placa: PLACA_LISTA,
   motivo: { tipo: 'string', descripcion: 'Motivo de la alerta (máx. 255)', requerido: true, ejemplo: 'Vehículo reportado como robado' },
   nivel_alerta: { tipo: 'string', descripcion: 'Nivel de la alerta', requerido: true, valores: ['CRITICA', 'ALTA', 'MEDIA'] },
@@ -157,6 +163,13 @@ function rutasLista(prefijo: string, etiqueta: string, nombre: string, permiso: 
       resumen: `Edición de un registro de la ${nombre}`,
       cuerpo,
       respuestas: { 400: 'Datos inválidos', 404: 'Registro no encontrado', 409: 'Otro registro tiene la misma placa' },
+    },
+    {
+      metodo: 'patch', ruta: `${prefijo}/:id(\\d+)/ficha`, etiqueta, acceso: 'listas:editar-ficha',
+      resumen: `Corrige únicamente institución y cargo de la ${nombre}`,
+      descripcion: 'Exige ambos campos como textos y rechaza propiedades adicionales. No cambia la placa, el estado, la vigencia, el horario ni la evidencia.',
+      cuerpo: { institucion: { ...FICHA_LISTA.institucion, requerido: true }, cargo: { ...FICHA_LISTA.cargo, requerido: true } },
+      respuestas: { 200: 'Datos actualizados.', 400: 'Ficha inválida', 404: 'Registro activo no encontrado' },
     },
     {
       metodo: 'delete', ruta: `${prefijo}/:id(\\d+)`, etiqueta, acceso: permiso,
@@ -605,6 +618,7 @@ export const RUTAS: RutaDoc[] = [
       tipo_vehiculo: { tipo: 'string', ejemplo: 'Camioneta' },
       marca: { tipo: 'string', descripcion: 'Marca del vehículo (opcional, hasta 50 caracteres)', ejemplo: 'Toyota' },
       persona_ingreso: { tipo: 'string', descripcion: 'Nombres y apellidos de quien ingresa (solo ingresos)', ejemplo: 'Ana Pérez' },
+      ...FICHA_LISTA,
       motivo_ingreso: { tipo: 'string', descripcion: 'Motivo de ingreso (solo ingresos)', ejemplo: 'Reunión de coordinación' },
       cuadro_t: {
         tipo: 'number', ejemplo: 1792634400.5,

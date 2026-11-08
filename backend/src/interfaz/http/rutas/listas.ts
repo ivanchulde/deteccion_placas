@@ -11,6 +11,7 @@ import { actorDe, controlador, idDe } from '../respuesta';
  *   GET    /:id    detalle de un registro
  *   POST   /       alta (reactiva el registro si la placa se había retirado)
  *   PUT    /:id    edición
+ *   PATCH  /:id/ficha  solo institución y cargo (listas:editar-ficha)
  *   DELETE /:id    retiro (baja lógica; en la lista blanca, «desactivar»), motivo opcional
  *
  * Solo lista blanca:
@@ -35,6 +36,11 @@ function crearRouter(def: DefinicionLista): Router {
   const edicion = [authMiddleware, requierePermiso(def.permisoEdicion)];
   const alta = [authMiddleware, requierePermiso(def.tipo === 'alertas' ? 'alertas:restringir' : 'padron:agregar')];
   const contexto = `LISTAS ${def.nombre}`;
+  router.patch('/:id(\\d+)/ficha', authMiddleware, requierePermiso('listas:editar-ficha'),
+    controlador(contexto, 'No se pudieron actualizar los datos.', async (req, res) => {
+      const id = idDe(req, res);
+      if (id !== null) res.json({ message: 'Datos actualizados.', item: await listas.editarFicha(def, id, req.body, actorDe(req)) });
+    }));
   // Los clientes anteriores reciben un cierre explícito; ninguna de estas rutas carga
   // conectores externos ni puede consumir créditos del proveedor.
   if (def.tipo === 'autorizados') {

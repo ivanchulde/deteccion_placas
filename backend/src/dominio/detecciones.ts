@@ -8,7 +8,7 @@ import {
 import { validarFechaHora } from './periodo';
 import { celdaCsv } from './auditoria';
 import { datosRegistro } from './registroCompleto';
-import { leerRegistroLista, LISTA_BLANCA } from './listas';
+import { CAMPOS_FICHA_LISTA, type FichaLista, leerRegistroLista, LISTA_BLANCA } from './listas';
 
 /**
  * Detecciones vehiculares (dominio puro): cada registro es un paso por un acceso.
@@ -235,7 +235,7 @@ export interface FichaIngreso {
 
 /** Quién ingresa y por qué. Un campo ausente (undefined) no cambia lo guardado; null lo borra. */
 export interface DatosIngreso {
-  ficha?: FichaIngreso;
+  ficha?: Partial<FichaIngreso>;
   cedula?: string | null;
   persona?: string | null;
   motivo?: string | null;
@@ -307,6 +307,8 @@ export interface RegistroManual {
   cuadroT: number | null;
   tipoVehiculo: string | null;
   marca: string | null;
+  /** Datos descriptivos del ingreso; no crean ni modifican permisos. */
+  ficha?: Partial<FichaLista>;
 }
 
 /** Paso registrado a mano: matrícula ANT si es legible; puede omitirse, nunca inventarse. */
@@ -321,6 +323,16 @@ export function leerRegistroManual(entrada: Entrada): Validado<RegistroManual> {
   if (!tipo.ok) return tipo;
   const marca = validarTexto(entrada.marca, { etiqueta: 'Marca', tipo: 'alfanumerico', max: 50 });
   if (!marca.ok) return marca;
+  const ficha: Partial<FichaLista> = {};
+  for (const campo of CAMPOS_FICHA_LISTA) {
+    if (entrada[campo.nombre] === undefined) continue;
+    if (entrada[campo.nombre] !== null && typeof entrada[campo.nombre] !== 'string') {
+      return { ok: false, error: `${campo.etiqueta}: ingrese un texto.` };
+    }
+    const texto = validarTexto(entrada[campo.nombre], campo);
+    if (!texto.ok) return texto;
+    ficha[campo.nombre as keyof FichaLista] = texto.valor;
+  }
   const camara = validarEntero(entrada.camara_id, { etiqueta: 'Cámara', min: 1, max: MAX_ID });
   if (!camara.ok) return camara;
   const cuadro = entrada.cuadro_t;
@@ -335,6 +347,7 @@ export function leerRegistroManual(entrada: Entrada): Validado<RegistroManual> {
       placa: placa.valor.placa, motivo: motivo.valor as string, camaraId: camara.valor, tipoVehiculo: tipo.valor,
       marca: marca.valor,
       cuadroT: hayCuadro ? cuadro as number : null,
+      ...(Object.keys(ficha).length ? { ficha } : {}),
     },
   };
 }

@@ -271,14 +271,14 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
     const vaciable = (v: string | null) => v ?? '';
     if (x.cedula !== undefined) poner('cedula_ingreso', sql.VarChar(10), vaciable(x.cedula));
     if (x.ficha) {
-      poner('institucion_ingreso', sql.VarChar(150), vaciable(x.ficha.institucion));
-      poner('cargo_ingreso', sql.VarChar(150), vaciable(x.ficha.cargo));
-      poner('departamento_ingreso', sql.VarChar(100), vaciable(x.ficha.departamento));
-      poner('categoria_permiso', sql.VarChar(20), x.ficha.categoria);
-      poner('observaciones_permiso', sql.VarChar(255), x.ficha.observaciones);
-      poner('vigencia_desde', sql.Date, x.ficha.vigenciaDesde);
-      poner('vigencia_hasta', sql.Date, x.ficha.vigenciaHasta);
-      poner('horario_permiso', sql.VarChar(600), x.ficha.horario);
+      if (x.ficha.institucion !== undefined) poner('institucion_ingreso', sql.VarChar(150), vaciable(x.ficha.institucion));
+      if (x.ficha.cargo !== undefined) poner('cargo_ingreso', sql.VarChar(150), vaciable(x.ficha.cargo));
+      if (x.ficha.departamento !== undefined) poner('departamento_ingreso', sql.VarChar(100), vaciable(x.ficha.departamento));
+      if (x.ficha.categoria !== undefined) poner('categoria_permiso', sql.VarChar(20), x.ficha.categoria);
+      if (x.ficha.observaciones !== undefined) poner('observaciones_permiso', sql.VarChar(255), x.ficha.observaciones);
+      if (x.ficha.vigenciaDesde !== undefined) poner('vigencia_desde', sql.Date, x.ficha.vigenciaDesde);
+      if (x.ficha.vigenciaHasta !== undefined) poner('vigencia_hasta', sql.Date, x.ficha.vigenciaHasta);
+      if (x.ficha.horario !== undefined) poner('horario_permiso', sql.VarChar(600), x.ficha.horario);
     }
     if (x.persona !== undefined) { request.input('persona', sql.VarChar(150), x.persona); campos.push('persona_ingreso = @persona'); }
     if (x.motivo !== undefined) { request.input('motivo', sql.VarChar(300), x.motivo); campos.push('motivo_ingreso = @motivo'); }

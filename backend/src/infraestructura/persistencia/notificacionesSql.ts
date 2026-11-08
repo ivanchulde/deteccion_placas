@@ -14,7 +14,7 @@ const PENDIENTE = 'n.requiere_ack = 1 AND n.fecha_atencion IS NULL AND n.fecha_r
 const VISIBLE_PARA_ROL = `(
   NOT EXISTS (SELECT 1 FROM Usuarios receptor JOIN Roles rol ON rol.id = receptor.rol_id
               WHERE receptor.id = @uid AND rol.codigo = 'GESTOR_PERMISOS')
-  OR n.tipo IN ('solicitud.nueva', 'solicitud.resuelta', 'padron.por_vencer')
+  OR n.tipo = 'padron.por_vencer'
   OR (n.tipo = 'acceso.llegada_permiso' AND EXISTS (
     SELECT 1 FROM ListaBlanca permiso JOIN DeteccionVehiculo paso ON paso.id = n.deteccion_id
     WHERE permiso.registrado_por = @uid

@@ -111,12 +111,12 @@ export const repositorioPanelSql: RepositorioPanel = {
     const h = hoyLocalSql();
 
     const [solicitudes, padron, categorias] = await Promise.all([
-      q(`
+      p.incluirSolicitudes ? q(`
         SELECT TOP 5 s.id, s.placa, s.propietario, s.categoria, s.motivo, s.fecha_solicitud, u.nombre_completo AS solicitante,
                (SELECT COUNT(*) FROM SolicitudesAcceso WHERE estado = 'pendiente' AND solicitado_por <> @uid) AS total
         FROM SolicitudesAcceso s JOIN Usuarios u ON u.id = s.solicitado_por
         -- Separación de funciones: las solicitudes propias no son trabajo pendiente de quien las registró
-        WHERE s.estado = 'pendiente' AND s.solicitado_por <> @uid ORDER BY s.fecha_solicitud`),
+        WHERE s.estado = 'pendiente' AND s.solicitado_por <> @uid ORDER BY s.fecha_solicitud`) : Promise.resolve({ recordset: [] }),
       q(`
         SELECT
           COUNT(*) AS total, SUM(CASE WHEN placa IS NULL THEN 1 ELSE 0 END) AS sin_placa,

@@ -20,7 +20,7 @@ import { validarEntero, validarTexto } from '../dominio/validacion';
  * repositorio (`reclamar`) para que dos personas no resuelvan la misma solicitud a la vez.
  *
  * Control de concurrencia optimista: cada edición incrementa la `version` de la solicitud y la
- * aprobación debe indicar la versión que revisó el gestor; si cambió mientras la revisaba (o entre
+ * aprobación debe indicar la versión que revisó la administración; si cambió mientras la revisaba (o entre
  * la lectura y el reclamo), no se aprueba (409) y el permiso nunca se concede a datos no revisados.
  * Todo cambio queda en la auditoría y se difunde con el evento `solicitudes:actualizadas`.
  */
@@ -104,7 +104,7 @@ export interface PuertoListas {
   anunciarAlta(def: DefinicionLista, registro: PermisoDTO, actor: Actor): void | Promise<void>;
 }
 
-/** Notificación al gestor (solicitud nueva) o al solicitante (solicitud resuelta). */
+/** Notificación a quienes pueden resolver (solicitud nueva) o al solicitante (solicitud resuelta). */
 export interface AvisoSolicitud {
   tipo: 'solicitud.nueva' | 'solicitud.resuelta';
   titulo: string;
@@ -130,6 +130,18 @@ export interface DependenciasSolicitudes {
 export function casosSolicitudes(d: DependenciasSolicitudes) {
   const avisar = () => d.eventos.emitir('solicitudes:actualizadas', {});
   const resuelve = (actor: Actor) => tienePermiso(actor.rol as Rol, 'solicitudes:resolver');
+  const crea = (actor: Actor) => tienePermiso(actor.rol as Rol, 'solicitudes:crear');
+  const verificarConsulta = (actor: Actor) => {
+    if (!crea(actor) && !resuelve(actor)) throw errorProhibido('No tiene permiso para consultar solicitudes de acceso.');
+  };
+  const verificarCreacion = (actor: Actor) => {
+    if (!crea(actor)) throw errorProhibido('No tiene permiso para registrar o gestionar solicitudes propias.');
+  };
+  const verificarResolucion = (actor: Actor, aprobacion = false) => {
+    if (!resuelve(actor) || (aprobacion && !tienePermiso(actor.rol as Rol, 'padron:gestionar'))) {
+      throw errorProhibido('No tiene permiso para resolver solicitudes de acceso.');
+    }
+  };
 
   const validar = (entrada: unknown, deteccionActual?: number | null): DatosSolicitud => {
     const r = leerSolicitud(entrada as Record<string, unknown>, deteccionActual);
@@ -169,6 +181,7 @@ export function casosSolicitudes(d: DependenciasSolicitudes) {
   return {
     /** Quien resuelve ve todas (o solo las suyas con `mias=1`); el resto, solo las propias. */
     listar(actor: Actor, consulta: { estado?: unknown; mias?: unknown }) {
+      verificarConsulta(actor);
       const estado = String(consulta.estado ?? 'pendiente');
       return d.repositorio.listar({
         usuarioId: actor.id,
@@ -179,10 +192,12 @@ export function casosSolicitudes(d: DependenciasSolicitudes) {
 
     /** Contador del menú: para quien resuelve, las pendientes de otros (SoD); para el resto, las propias. */
     async resumen(actor: Actor) {
+      verificarConsulta(actor);
       return { pendientes: await d.repositorio.contarPendientes(actor.id, resuelve(actor)) };
     },
 
     async crear(entrada: unknown, actor: Actor) {
+      verificarCreacion(actor);
       const s = validar(entrada);
       await sinOtraPendiente(s.registro.placa);
       const id = await d.repositorio.crear(s, actor.id);
@@ -201,6 +216,7 @@ export function casosSolicitudes(d: DependenciasSolicitudes) {
     },
 
     async editar(id: number, entrada: unknown, actor: Actor) {
+      verificarCreacion(actor);
       const actual = await existente(id);
       verificarEditable(actual, actor);
       const s = validar(entrada, actual.deteccion_id);
@@ -217,10 +233,11 @@ export function casosSolicitudes(d: DependenciasSolicitudes) {
     },
 
     /**
-     * Aprueba la versión que revisó el gestor, con ajustes opcionales del permiso; sin permiso
+     * Aprueba la versión que revisó la administración, con ajustes opcionales del permiso; sin permiso
      * concedido no hay aprobación.
      */
     async aprobar(id: number, entrada: { comentario?: unknown; ajustes?: unknown; version?: unknown } | undefined, actor: Actor) {
+      verificarResolucion(actor, true);
       const c = validarTexto(entrada?.comentario, REGLA_COMENTARIO);
       if (!c.ok) throw errorValidacion(c.error);
       const comentario = c.valor;
@@ -270,6 +287,7 @@ export function casosSolicitudes(d: DependenciasSolicitudes) {
     },
 
     async rechazar(id: number, comentario: unknown, actor: Actor) {
+      verificarResolucion(actor);
       const c = validarTexto(comentario, REGLA_RECHAZO);
       if (!c.ok) throw errorValidacion(c.error);
       const motivo = c.valor!;
@@ -290,6 +308,7 @@ export function casosSolicitudes(d: DependenciasSolicitudes) {
 
     /** Quien la registró la retira mientras está pendiente (baja lógica: queda como cancelada). */
     async cancelar(id: number, actor: Actor) {
+      verificarCreacion(actor);
       const placa = await d.repositorio.cancelar(id, actor.id);
       if (!placa) throw errorNoEncontrado('No hay una solicitud pendiente propia con ese número.');
       await d.auditoria.operacion(actor, 'SOLICITUD_CANCELADA', ENTIDAD, id, placa);

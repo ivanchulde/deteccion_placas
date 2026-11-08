@@ -67,13 +67,13 @@ export const RUTAS_EXTRA: ItemMenu[] = [
 
 /**
  * Vista única del gestor de permisos: quien gestiona el padrón sin permisos de operación trabaja
- * en una sola pantalla (solicitudes, permisos de placa y placas sin permiso), sin monitoreo en vivo.
+ * en una sola pantalla de permisos propios, sin recepción de solicitudes ni monitoreo en vivo.
  */
 export const MENU_GESTION_PERMISOS: GrupoMenu[] = [
   {
     titulo: 'Control de accesos',
     items: [
-      { ruta: '/', titulo: 'Gestión de permisos', descripcion: 'Registre vehículos en la lista blanca y resuelva las solicitudes de acceso', icono: <ShieldCheck size={18} />, permiso: 'padron:gestionar', contador: 'solicitudes' },
+      { ruta: '/', titulo: 'Gestión de permisos', descripcion: 'Conceda y administre los permisos de su lista blanca', icono: <ShieldCheck size={18} />, permiso: 'padron:gestionar' },
     ],
   },
 ];

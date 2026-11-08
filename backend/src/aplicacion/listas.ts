@@ -2,7 +2,7 @@ import {
   ACTOR_SISTEMA, type Actor, errorConflicto, errorNoEncontrado, errorProhibido, errorValidacion, type PuertoAuditoria, type PuertoEventos,
 } from './comun';
 import {
-  camposModificados, type DefinicionLista, describirRegistro, leerRegistroLista, type RegistroLista,
+  CAMPOS_FICHA_LISTA, camposModificados, type DefinicionLista, describirRegistro, type FichaLista, leerFichaLista, leerRegistroLista, type RegistroLista,
 } from '../dominio/listas';
 import { validarEntero, validarTexto, validarPlaca } from '../dominio/validacion';
 import { type Rol, tienePermiso } from '../dominio/permisos';
@@ -31,6 +31,8 @@ export interface RepositorioListas {
   crear(def: DefinicionLista, r: RegistroLista, usuarioId: number, solicitudId?: number): Promise<number>;
   reactivar(def: DefinicionLista, id: number, r: RegistroLista, usuarioId: number, solicitudId?: number): Promise<void>;
   actualizar(def: DefinicionLista, id: number, r: RegistroLista): Promise<void>;
+  /** Solo datos descriptivos; conserva placa, vigencia, estado, horario y evidencia. */
+  actualizarFicha(def: DefinicionLista, id: number, ficha: FichaLista): Promise<boolean>;
   /** Baja lógica; devuelve la placa retirada o null si no estaba activa */
   retirar(def: DefinicionLista, id: number): Promise<string | null>;
   /** Permisos de la lista blanca de todos los usuarios (o de uno), activos, retirados o todos, con `activo` */
@@ -197,6 +199,11 @@ export function casosListas(d: DependenciasListas) {
       const anterior = await d.repositorio.obtenerActivo(def, id);
       if (!anterior) throw errorNoEncontrado('Registro no encontrado.');
       verificarPropietario(def, anterior, actor);
+      // Clientes anteriores de lista negra no enviaban estos campos. Su edición de la alerta
+      // conserva la ficha; enviar un texto vacío sigue limpiándola de forma explícita.
+      if (def.tipo === 'alertas') for (const { nombre } of CAMPOS_FICHA_LISTA) {
+        if ((entrada as Record<string, unknown> | null)?.[nombre] === undefined) r.datos[nombre] = anterior[nombre] ?? null;
+      }
       if (r.placa && await d.repositorio.existeOtraConPlaca(def, r.placa, id)) throw errorConflicto(`Ya existe otro registro con la placa ${r.placa}.`);
       const cedula = def.tipo === 'autorizados' ? r.datos.cedula : null;
       if (cedula && d.repositorio.existeOtraConCedula && await d.repositorio.existeOtraConCedula(def, cedula, id)) {
@@ -205,6 +212,20 @@ export function casosListas(d: DependenciasListas) {
       await d.repositorio.actualizar(def, id, r);
       const cambios = camposModificados(def, anterior, r, d.describirHorario);
       await d.auditoria.operacion(actor, 'LISTA_EDICION', def.entidad, id, `${r.placa}: ${cambios.join(', ') || 'sin cambios'}`);
+      difundir(def);
+      return (await d.repositorio.obtener(def, id))!;
+    },
+
+    async editarFicha(def: DefinicionLista, id: number, entrada: unknown, actor: Actor) {
+      if (!tienePermiso(actor.rol as Rol, 'listas:editar-ficha')) throw errorProhibido('No tiene permiso para editar la ficha de las listas.');
+      const ficha = leerFichaLista(entrada);
+      if (!ficha.ok) throw errorValidacion(ficha.error);
+      const anterior = await d.repositorio.obtenerActivo(def, id);
+      if (!anterior || !await d.repositorio.actualizarFicha(def, id, ficha.valor)) throw errorNoEncontrado('Registro no encontrado.');
+      const cambios = CAMPOS_FICHA_LISTA.map(c => c.nombre)
+        .filter(nombre => (anterior[nombre] ?? null) !== ficha.valor[nombre as keyof FichaLista]);
+      await d.auditoria.operacion(actor, 'LISTA_EDICION_FICHA', def.entidad, id,
+        `${anterior.placa || anterior.propietario || 'Sin placa'}: ${cambios.join(', ') || 'sin cambios'}`);
       difundir(def);
       return (await d.repositorio.obtener(def, id))!;
     },

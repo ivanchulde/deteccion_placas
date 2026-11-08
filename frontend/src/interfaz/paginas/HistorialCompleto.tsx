@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowDownRight, ArrowUpRight, BarChart3, CarFront, Download, Edit3, ExternalLink, ImageOff, ListFilter, LogOut, Plus, Search, SlidersHorizontal, Trash2, UserRound, X } from 'lucide-react';
-import api, { mensajeError, urlMedia } from '../../infraestructura/api';
+import { ArrowDownRight, ArrowUpRight, BarChart3, CarFront, Download, Edit3, ExternalLink, FileText, ImageOff, ListFilter, LogOut, Plus, Search, SlidersHorizontal, Trash2, UserRound, X } from 'lucide-react';
+import api, { mensajeErrorDescarga, urlMedia } from '../../infraestructura/api';
 import { useAuth } from '../../aplicacion/AuthContext';
 import { useEvento, useReconexion } from '../../aplicacion/tiempoReal';
 import { useConsulta, useDiferido, useRetardado } from '../../aplicacion/hooks';
@@ -72,6 +72,8 @@ const PanelRegistro: React.FC<{
     ['Hora de salida', horas.salida ? `${hora(horas.salida)}${d.salida_automatica ? ' · automática' : ''}` : '—'],
     ['Persona', nombre || '—'],
     ['Cédula', d.datos_permiso?.cedula || '—'],
+    ['Institución', d.datos_permiso?.institucion || '—'],
+    ['Cargo', d.datos_permiso?.cargo || '—'],
     ['Vehículo', vehiculo(d) || '—'],
     ['Motivo', d.motivo_ingreso || '—'],
     ['Cámara', d.camara?.nombre ?? (d.fuente === 'manual' ? 'Registro manual' : '—')],
@@ -138,7 +140,7 @@ const HistorialCompleto: React.FC = () => {
   const [texto, setTexto] = useState(() => params.get('buscar') ?? '');
   const buscar = useRetardado(texto.trim(), 400);
   const [zoom, setZoom] = useState<Deteccion | null>(null);
-  const [exportando, setExportando] = useState(false);
+  const [exportando, setExportando] = useState<'csv' | 'pdf' | null>(null);
   const [creando, setCreando] = useState(false);
   const [editando, setEditando] = useState<Deteccion | null>(null);
   const [eliminando, setEliminando] = useState<Deteccion | null>(null);
@@ -157,9 +159,13 @@ const HistorialCompleto: React.FC = () => {
   };
   useEffect(() => { if ((params.get('buscar') ?? '') !== buscar) cambiar({ buscar: buscar || undefined }); }, [buscar]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const buscado = params.get('buscar') ?? '';
+  const placaBuscada = validarPlaca(placa || buscado);
   const consulta = {
     desde: desde ? limiteDia(desde) : undefined, hasta: hasta ? limiteDia(hasta, true) : undefined,
-    placa: placa || undefined, camara: camara || undefined, buscar: params.get('buscar') || undefined, estado: ESTADOS[estado].estado,
+    placa: placaBuscada.ok ? placaBuscada.valor.placa : placa || undefined,
+    exacta: placaBuscada.ok ? 'si' : undefined,
+    camara: camara || undefined, buscar: placa || !placaBuscada.ok ? buscado || undefined : undefined, estado: ESTADOS[estado].estado,
     movimiento: movimiento || undefined, origen: origen || undefined, hora_desde: horaDesde || undefined, hora_hasta: horaHasta || undefined,
     cerrados: cerrados || undefined,
     // Una visita, una fila: la salida que cerró un ingreso va en la fila de ese ingreso
@@ -215,15 +221,18 @@ const HistorialCompleto: React.FC = () => {
     void resumen.recargar(true);
   };
 
-  const exportar = async () => {
-    setExportando(true);
+  const exportar = async (formato: 'csv' | 'pdf') => {
+    setExportando(formato);
     try {
-      const r = await api.get('/detecciones/exportar', { params: consulta, responseType: 'blob' });
-      descargarBlob(r.data, nombreDescarga(r.headers['content-disposition'], 'historial_anpr.csv'));
+      const ruta = formato === 'pdf' ? '/detecciones/historial/reporte.pdf' : '/detecciones/exportar';
+      const r = await api.get(ruta, { params: consulta, responseType: 'blob' });
+      descargarBlob(r.data, nombreDescarga(r.headers['content-disposition'], `historial_anpr.${formato}`));
     } catch (e) {
-      notificar('error', 'No se pudo exportar', mensajeError(e));
-    } finally { setExportando(false); }
+      notificar('error', 'No se pudo exportar', await mensajeErrorDescarga(e));
+    } finally { setExportando(null); }
   };
+  const exportacionDeshabilitada = Boolean(exportando) || cargando || Boolean(error) || !datos?.total
+    || texto.trim() !== (params.get('buscar') ?? '');
 
   const limpiar = () => {
     setTexto('');
@@ -237,7 +246,6 @@ const HistorialCompleto: React.FC = () => {
   const hayFiltros = Boolean(placa || camara || estado || movimiento || origen || cerrados || horaDesde || horaHasta || params.get('buscar'));
 
   // Reportes directos de lo buscado: una placa completa o un nombre (dos palabras o más, sin números)
-  const buscado = params.get('buscar') ?? '';
   const placaReporte = (() => { const v = validarPlaca(buscado || placa); return v.ok ? v.valor.placa : ''; })();
   const nombreReporte = !placaReporte && /^[\p{L}'. -]+$/u.test(buscado) && buscado.trim().split(/\s+/).length >= 2 ? buscado.trim() : '';
   const puedeReportes = puede('reportes:ver');
@@ -269,7 +277,10 @@ const HistorialCompleto: React.FC = () => {
         <div className="fila">
           {esAdmin && <button type="button" className="btn btn-exito" onClick={() => setCreando(true)}><Plus size={15} /> Crear registro</button>}
           <Link to="/detecciones" className="btn btn-secondary"><LogOut size={15} /> Registro de Salidas</Link>
-          <button className="btn btn-navy" onClick={exportar} disabled={exportando || !datos?.total}><Download size={15} /> {exportando ? 'Exportando…' : 'Exportar CSV'}</button>
+          <button type="button" className="btn btn-secondary" onClick={() => void exportar('pdf')} disabled={exportacionDeshabilitada}
+            title="Descarga todos los registros que coinciden con los filtros"><FileText size={15} /> {exportando === 'pdf' ? 'Generando PDF…' : 'Descargar PDF'}</button>
+          <button type="button" className="btn btn-navy" onClick={() => void exportar('csv')} disabled={exportacionDeshabilitada}>
+            <Download size={15} /> {exportando === 'csv' ? 'Exportando…' : 'Exportar CSV'}</button>
           {puedeEliminarTodo && <button type="button" className="btn btn-danger" onClick={() => setEliminarTodos(true)}><Trash2 size={15} /> Eliminar todos</button>}
         </div>
       </header>

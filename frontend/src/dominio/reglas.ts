@@ -30,6 +30,8 @@ export const REGLAS_LISTA_BLANCA = {
 
 /** Lista negra (dominio/listas.ts → LISTA_NEGRA). */
 export const REGLAS_LISTA_NEGRA = {
+  institucion: REGLAS_LISTA_BLANCA.institucion,
+  cargo: REGLAS_LISTA_BLANCA.cargo,
   motivo: { etiqueta: 'Motivo', tipo: 'libre', max: 255, min: 5, requerido: true },
   tipo_vehiculo: { etiqueta: 'Tipo de vehículo', tipo: 'alfanumerico', max: 50 },
 } satisfies Reglas;
