@@ -30,7 +30,8 @@ export interface RepositorioListas {
   existeOtraConPlaca(def: DefinicionLista, placa: string, idExcluido: number): Promise<boolean>;
   crear(def: DefinicionLista, r: RegistroLista, usuarioId: number, solicitudId?: number): Promise<number>;
   reactivar(def: DefinicionLista, id: number, r: RegistroLista, usuarioId: number, solicitudId?: number): Promise<void>;
-  actualizar(def: DefinicionLista, id: number, r: RegistroLista): Promise<void>;
+  /** Actualiza una fila activa. Devuelve false si dejó de estar disponible. */
+  actualizar(def: DefinicionLista, id: number, r: RegistroLista): Promise<boolean>;
   /** Solo datos descriptivos; conserva placa, vigencia, estado, horario y evidencia. */
   actualizarFicha(def: DefinicionLista, id: number, ficha: FichaLista): Promise<boolean>;
   /** Baja lógica; devuelve la placa retirada o null si no estaba activa */
@@ -156,7 +157,7 @@ export function casosListas(d: DependenciasListas) {
     if (previo) verificarPropietario(def, previo, actor);
     if (previo?.activo) {
       if (!opciones.actualizarSiExiste) throw errorConflicto(`La placa ${r.placa} ya está en la ${def.nombre}.`);
-      await d.repositorio.actualizar(def, previo.id, r);
+      if (!await d.repositorio.actualizar(def, previo.id, r)) throw errorConflicto('El registro dejó de estar activo. Vuelva a intentarlo.');
       return { id: previo.id, accion: 'actualizado' as AccionGuardado };
     }
     if (previo) {
@@ -195,6 +196,10 @@ export function casosListas(d: DependenciasListas) {
     },
 
     async editar(def: DefinicionLista, id: number, entrada: unknown, actor: Actor) {
+      const rol = actor.rol as Rol;
+      if (!tienePermiso(rol, 'listas:editar-registro') && !tienePermiso(rol, def.permisoEdicion)) {
+        throw errorProhibido('No tiene permiso para editar el registro de esta lista.');
+      }
       const r = validar(def, entrada);
       const anterior = await d.repositorio.obtenerActivo(def, id);
       if (!anterior) throw errorNoEncontrado('Registro no encontrado.');
@@ -209,7 +214,7 @@ export function casosListas(d: DependenciasListas) {
       if (cedula && d.repositorio.existeOtraConCedula && await d.repositorio.existeOtraConCedula(def, cedula, id)) {
         throw errorConflicto(`La cédula ${cedula} ya tiene otro permiso activo en la lista blanca.`);
       }
-      await d.repositorio.actualizar(def, id, r);
+      if (!await d.repositorio.actualizar(def, id, r)) throw errorNoEncontrado('Registro no encontrado.');
       const cambios = camposModificados(def, anterior, r, d.describirHorario);
       await d.auditoria.operacion(actor, 'LISTA_EDICION', def.entidad, id, `${r.placa}: ${cambios.join(', ') || 'sin cambios'}`);
       difundir(def);

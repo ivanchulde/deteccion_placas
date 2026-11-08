@@ -12,7 +12,7 @@ export const ROLES_ORDEN: Rol[] = ['Guardia', 'GestorPermisos', 'Admin'];
 
 export type Permiso =
   | 'operacion:monitorear' | 'detecciones:validar' | 'detecciones:gestionar' | 'detecciones:eliminar-individual' | 'detecciones:eliminar'
-  | 'listas:ver' | 'listas:editar-ficha' | 'padron:agregar' | 'padron:gestionar' | 'padron:supervisar' | 'alertas:restringir' | 'alertas:gestionar' | 'accesos:excepcion'
+  | 'listas:ver' | 'listas:editar-ficha' | 'listas:editar-registro' | 'padron:agregar' | 'padron:gestionar' | 'padron:supervisar' | 'alertas:restringir' | 'alertas:gestionar' | 'accesos:excepcion'
   | 'solicitudes:crear' | 'solicitudes:resolver'
   | 'avisos:garita' | 'avisos:acceso' | 'avisos:seguridad' | 'avisos:sistema' | 'avisos:padron' | 'alarmas:escalamiento'
   | 'reportes:ver'
@@ -35,6 +35,7 @@ export const ETIQUETA_PERMISO: Record<Permiso, string> = {
   'detecciones:eliminar': 'Eliminar múltiples registros y su evidencia',
   'listas:ver': 'Consultar la lista blanca y la lista negra',
   'listas:editar-ficha': 'Editar institución y cargo en la lista blanca y la lista negra',
+  'listas:editar-registro': 'Editar los datos y condiciones de registros en ambas listas',
   'padron:agregar': 'Agregar vehículos a la lista blanca',
   'padron:gestionar': 'Editar y retirar permisos de la lista blanca: vigencia, horarios y categoría',
   'padron:supervisar': 'Consultar y gestionar los permisos otorgados por todos los usuarios, incluidos los retirados',

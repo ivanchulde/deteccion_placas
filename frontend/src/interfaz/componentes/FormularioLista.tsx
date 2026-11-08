@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
 import type { Deteccion, Franja, RegistroLista } from '../../dominio/tipos';
-import { fechaIsoLocal } from '../../dominio/formato';
+import { CATEGORIAS_PERMISO, fechaIsoLocal } from '../../dominio/formato';
 import { errorDe, erroresTexto, normalizarPlaca, placaPropuesta, sinErrores, validarPlaca, valorPrecargado } from '../../dominio/validacion';
 import { REGLA_MOTIVO_INGRESO, REGLA_OBSERVACIONES, REGLAS_LISTA_BLANCA, REGLAS_LISTA_NEGRA, REGLAS_VEHICULO } from '../../dominio/reglas';
 import { Aviso, Modal } from './ui';
@@ -46,12 +46,12 @@ export const FormularioLista: React.FC<{
     institucion: String(base.institucion ?? ''),
     cargo: String(base.cargo ?? ''),
     departamento: String(base.departamento ?? ''),
-    tipo_vehiculo: valorPrecargado(base.tipo_vehiculo, REGLAS_VEHICULO.tipo_vehiculo),
+    tipo_vehiculo: registro ? registro.tipo_vehiculo ?? '' : valorPrecargado(base.tipo_vehiculo, REGLAS_VEHICULO.tipo_vehiculo),
     motivo: String(base.motivo ?? ''),
     nivel_alerta: String(base.nivel_alerta ?? 'ALTA'),
-    marca: valorPrecargado(base.marca, REGLAS_VEHICULO.marca),
+    marca: registro ? registro.marca ?? '' : valorPrecargado(base.marca, REGLAS_VEHICULO.marca),
     modelo: String(base.modelo ?? ''),
-    color: valorPrecargado(base.color, REGLAS_VEHICULO.color),
+    color: registro ? registro.color ?? '' : valorPrecargado(base.color, REGLAS_VEHICULO.color),
     fecha_vencimiento: String(base.fecha_vencimiento ?? base.fecha_fin ?? '').slice(0, 10),
     observaciones: String(base.observaciones ?? ''),
     motivo_ingreso: String(base.motivo_ingreso ?? ''),
@@ -116,7 +116,14 @@ export const FormularioLista: React.FC<{
         {evidenciaRegistro && <FotosEvidenciaLista registro={evidenciaRegistro} />}
         {autorizados ? <CamposFormularioPermiso prefijo="l" valor={{ ...f, fecha_fin: f.fecha_vencimiento }}
           onCambiar={c => { const { fecha_fin, ...resto } = c; setF(x => ({ ...x, ...resto, ...(fecha_fin === undefined ? {} : { fecha_vencimiento: fecha_fin }) })); }}
-          horario={horario} onHorario={setHorario} deteccion={deteccion} distribucion="panoramica" /> : <>
+          horario={horario} onHorario={setHorario} deteccion={deteccion} distribucion="panoramica">
+          {registro && <div className="campo">
+            <label htmlFor="l-categoria">Categoría del permiso</label>
+            <select id="l-categoria" className="select" value={f.categoria} onChange={campo('categoria')}>
+              {Object.entries(CATEGORIAS_PERMISO).map(([valor, etiqueta]) => <option key={valor} value={valor}>{etiqueta}</option>)}
+            </select>
+          </div>}
+        </CamposFormularioPermiso> : <>
           <div className="completo formulario-permiso panoramico formulario-lista-negra">
             {!registro && mostrarEvidencia && <EvidenciaListaNegra placa={f.placa} deteccion={deteccion} />}
             <fieldset className="formulario-seccion">

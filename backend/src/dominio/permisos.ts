@@ -42,6 +42,7 @@ export const PERMISOS = {
   // Listas de control
   'listas:ver': 'Consultar el padrón de autorizados y la lista de alertas',
   'listas:editar-ficha': 'Corregir únicamente institución y cargo en las listas blanca y negra',
+  'listas:editar-registro': 'Editar los datos de los registros activos de las listas blanca y negra',
   'padron:agregar': 'Agregar vehículos a la lista blanca, también al confirmar una lectura',
   'padron:gestionar': 'Edición, retiro e importación de permisos de placa (vigencias, horarios, categoría)',
   'padron:supervisar': 'Consultar y gestionar los permisos otorgados por todos los usuarios, incluidos los retirados',
@@ -74,11 +75,12 @@ export type Permiso = keyof typeof PERMISOS;
 /** Matriz rol → permisos. */
 export const MATRIZ: Record<Rol, readonly Permiso[]> = {
   // Punto de control: monitorea, valida lecturas, consulta las listas y solicita accesos. Agrega placas a
-  // las listas desde la garita y corrige institución/cargo, pero no las quita ni cambia la
-  // autorización, vigencia o condiciones de una placa.
+  // las listas desde la garita y edita los datos de los registros activos. El retiro, la
+  // reactivación de permisos y la importación se controlan por separado.
   // Recibe los avisos de garita y la notificación de cada permiso otorgado.
   Guardia: [
-    'operacion:monitorear', 'detecciones:validar', 'detecciones:eliminar-individual', 'listas:ver', 'listas:editar-ficha', 'padron:agregar', 'solicitudes:crear', 'alertas:restringir',
+    'operacion:monitorear', 'detecciones:validar', 'detecciones:eliminar-individual', 'listas:ver', 'listas:editar-ficha', 'listas:editar-registro',
+    'padron:agregar', 'solicitudes:crear', 'alertas:restringir',
     'avisos:garita', 'avisos:acceso', 'avisos:seguridad', 'avisos:padron',
   ],
   // Una sola vista (gestión de permisos), sin monitoreo: concede permisos de placa.

@@ -74,7 +74,7 @@ const VEHICULO: Record<string, CampoDoc> = {
   observaciones: { tipo: 'string', descripcion: 'Observaciones (máx. 255)' },
 };
 
-const PLACA_LISTA: CampoDoc = { tipo: 'string', descripcion: 'Placa (4 a 10 letras y números)', requerido: true, ejemplo: 'PBA1234' };
+const PLACA_LISTA: CampoDoc = { tipo: 'string', nullable: true, descripcion: 'Formato ANT con o sin guion. Puede quedar vacía o en null.', ejemplo: 'PBA1234' };
 const HORARIO: CampoDoc = {
   tipo: 'array',
   descripcion: 'Lista de franjas { dias (1 = lunes … 7 = domingo), desde, hasta (HH:MM) }; null = sin restricción horaria',
@@ -90,9 +90,11 @@ const CUERPO_AUTORIZADO: Record<string, CampoDoc> = {
   ...FICHA_LISTA,
   placa: PLACA_LISTA,
   propietario: { tipo: 'string', descripcion: 'Propietario o responsable (máx. 150)', requerido: true, ejemplo: 'Juan Pérez' },
+  cedula: { tipo: 'string', descripcion: 'Diez dígitos, conservando los ceros iniciales', ejemplo: '0123456789' },
   departamento: { tipo: 'string', descripcion: 'Departamento (máx. 100)', ejemplo: 'Sala de operaciones' },
   categoria: { tipo: 'string', descripcion: 'Categoría del permiso (por omisión FUNCIONARIO)', valores: CATEGORIAS },
   tipo_vehiculo: { tipo: 'string', descripcion: 'Tipo de vehículo (máx. 50)', ejemplo: 'Automóvil' },
+  motivo_ingreso: { tipo: 'string', descripcion: 'Motivo habitual de ingreso (máx. 300)', ejemplo: 'Jornada laboral' },
   ...VEHICULO,
   fecha_inicio: { tipo: 'string', formato: 'date', descripcion: 'Inicio de vigencia (AAAA-MM-DD)', ejemplo: '2026-10-01' },
   fecha_vencimiento: { tipo: 'string', formato: 'date', descripcion: 'Fin de vigencia (AAAA-MM-DD)', ejemplo: '2026-12-31' },
@@ -104,8 +106,11 @@ const CUERPO_ALERTA: Record<string, CampoDoc> = {
   placa: PLACA_LISTA,
   motivo: { tipo: 'string', descripcion: 'Motivo de la alerta (máx. 255)', requerido: true, ejemplo: 'Vehículo reportado como robado' },
   nivel_alerta: { tipo: 'string', descripcion: 'Nivel de la alerta', requerido: true, valores: ['CRITICA', 'ALTA', 'MEDIA'] },
+  tipo_vehiculo: { tipo: 'string', descripcion: 'Tipo de vehículo (máx. 50)', ejemplo: 'Automóvil' },
   ...VEHICULO,
+  fecha_inicio: { tipo: 'string', formato: 'date', descripcion: 'Inicio de vigencia de la alerta (AAAA-MM-DD)', ejemplo: '2026-10-01' },
   fecha_vencimiento: { tipo: 'string', formato: 'date', descripcion: 'Fin de vigencia de la alerta (AAAA-MM-DD)', ejemplo: '2026-12-31' },
+  horario: HORARIO,
 };
 
 /** Alta y edición de una solicitud de acceso: reglas de la lista blanca más el motivo (dominio/solicitudesAcceso.ts). */
@@ -159,8 +164,9 @@ function rutasLista(prefijo: string, etiqueta: string, nombre: string, permiso: 
       respuestas: { 200: 'Registro reactivado', 201: 'Registro creado', 400: 'Datos inválidos', 409: 'La placa ya está en la lista' },
     },
     {
-      metodo: 'put', ruta: `${prefijo}/:id(\\d+)`, etiqueta, acceso: permiso,
+      metodo: 'put', ruta: `${prefijo}/:id(\\d+)`, etiqueta, acceso: { algunoDe: ['listas:editar-registro', permiso] },
       resumen: `Edición de un registro de la ${nombre}`,
+      descripcion: 'Actualiza los datos, la vigencia y el horario de una fila activa. Los gestores de permisos solo pueden editar los permisos de la lista blanca que registraron.',
       cuerpo,
       respuestas: { 400: 'Datos inválidos', 404: 'Registro no encontrado', 409: 'Otro registro tiene la misma placa' },
     },

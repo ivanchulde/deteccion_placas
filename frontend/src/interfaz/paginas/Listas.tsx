@@ -17,7 +17,6 @@ import { CeldaEvidenciaLista } from '../componentes/EvidenciaLista';
 import { ImportarPermisos } from '../componentes/ImportarPermisos';
 import { RegistradoPor } from '../componentes/RegistradoPor';
 import { AccionesPermiso, useAccionesPermiso } from '../componentes/AccionesPermiso';
-import { EditarFichaLista } from '../componentes/EditarFichaLista';
 
 type Vigencia = 'todas' | 'vigentes' | 'por_vencer' | 'vencidas';
 /** Estado de «Mis permisos» (valores de la API: retirados = desactivados). */
@@ -67,11 +66,8 @@ const Listas: React.FC<{ tipo?: TipoLista; incrustada?: boolean; soloMios?: bool
   const navigate = useNavigate();
   const notificar = useNotificar();
   const [params] = useSearchParams();
-  // Cada lista tiene su propio permiso de edición (matriz RBAC): el gestor de permisos edita el
-  // padrón pero no la lista de alertas
-  const puedeEditar = puede(tipo === 'autorizados' ? 'padron:gestionar' : 'alertas:gestionar');
-  const puedeEditarFicha = puede('listas:editar-ficha');
-  const mostrarAcciones = puedeEditar || puedeEditarFicha;
+  const puedeGestionar = puede(tipo === 'autorizados' ? 'padron:gestionar' : 'alertas:gestionar');
+  const puedeEditar = puedeGestionar || puede('listas:editar-registro');
   const puedeAgregar = puede(tipo === 'autorizados' ? 'padron:agregar' : 'alertas:restringir');
   const [busqueda, setBusqueda] = useState(() => params.get('q') ?? '');
   const [vigencia, setVigencia] = useState<Vigencia>(() => {
@@ -79,12 +75,11 @@ const Listas: React.FC<{ tipo?: TipoLista; incrustada?: boolean; soloMios?: bool
     return v === 'vigentes' || v === 'por_vencer' || v === 'vencidas' ? v : 'todas';
   });
   const [editando, setEditando] = useState<RegistroLista | 'nuevo' | null>(null);
-  const [ficha, setFicha] = useState<RegistroLista | null>(null);
   const [retirando, setRetirando] = useState<RegistroLista | null>(null);
   const [importando, setImportando] = useState(false);
   // «Mis permisos» también muestra los desactivados, para volver a activarlos o renovarlos
   const [estado, setEstado] = useState<EstadoPermisos>('activos');
-  const { datos, setDatos, cargando, error, recargar } = useConsulta<RegistroLista[]>(() => (soloMios
+  const { datos, cargando, error, recargar } = useConsulta<RegistroLista[]>(() => (soloMios
     ? api.get('/vehiculos-autorizados/mis-permisos', { params: { estado } }) : api.get(RUTA_API[tipo])).then(r => r.data), [tipo, soloMios, estado]);
   const acciones = useAccionesPermiso(() => recargar(true));
   const diferido = useDiferido(() => recargar(true), 800);
@@ -119,7 +114,7 @@ const Listas: React.FC<{ tipo?: TipoLista; incrustada?: boolean; soloMios?: bool
             { valor: 'alertas', etiqueta: 'Lista negra', icono: <ShieldAlert size={15} /> },
           ]} />}
 
-        {!puedeEditar && !puedeAgregar && !puedeEditarFicha && <AvisoFlotante tipo="info" titulo="Consulta de permisos" alClic={tipo === 'autorizados' ? () => navigate('/solicitudes?seccion=solicitudes') : undefined}>Consulta de solo lectura. {tipo === 'autorizados'
+        {!puedeEditar && !puedeAgregar && <AvisoFlotante tipo="info" titulo="Consulta de permisos" alClic={tipo === 'autorizados' ? () => navigate('/solicitudes?seccion=solicitudes') : undefined}>Consulta de solo lectura. {tipo === 'autorizados'
           ? <>Los permisos los otorga el gestor. Puede completar una placa pendiente después de verificar a la persona. Para un nuevo permiso, <Link to="/solicitudes?seccion=solicitudes">envíe una solicitud de acceso</Link>.</>
           : 'Las altas y cambios los realiza el administrador.'}</AvisoFlotante>}
         {/* La lista blanca muestra los permisos activos; el registro completo por usuario está en Solicitudes */}
@@ -139,7 +134,7 @@ const Listas: React.FC<{ tipo?: TipoLista; incrustada?: boolean; soloMios?: bool
               <Download size={14} /> Exportar
             </button>
             {/* Permisos desde la hoja de Excel de la garita (id, nombres, cedula, institucion, cargo, placa, marca, modelo, tipo, color) */}
-            {puedeEditar && tipo === 'autorizados' && <button className="btn btn-secondary btn-sm" onClick={() => setImportando(true)}>
+            {puedeGestionar && tipo === 'autorizados' && <button className="btn btn-secondary btn-sm" onClick={() => setImportando(true)}>
               <Upload size={14} /> Importar
             </button>}
             {puedeAgregar && <button className={`btn btn-sm ${tipo === 'autorizados' ? 'btn-navy' : 'btn-primary'}`} onClick={() => setEditando('nuevo')}><Plus size={14} /> Agregar</button>}
@@ -168,10 +163,10 @@ const Listas: React.FC<{ tipo?: TipoLista; incrustada?: boolean; soloMios?: bool
                   ? <><th>ID</th><th>Nombres y apellidos</th><th>Cédula</th><th>Institución</th><th>Cargo</th><th>Placa</th><th>Vehículo</th><th>Placa recortada</th><th>Marca</th><th>Modelo</th><th>Tipo</th><th>Color</th></>
                   : <><th>Placa</th><th>Vehículo</th><th>Placa recortada</th><th>Institución</th><th>Cargo</th><th>Motivo</th><th>Nivel</th></>}
                 <th>Vigencia</th><th className="num ocultar-movil">{tipo === 'autorizados' ? 'Ingresos' : 'Detecciones'}</th>
-                <th className="ocultar-movil">Registrado por</th>{mostrarAcciones && <th>Acciones</th>}
+                <th className="ocultar-movil">Registrado por</th>{puedeEditar && <th>Acciones</th>}
               </tr></thead>
               <tbody>
-                {cargando && !datos ? <FilasEsqueleto columnas={(tipo === 'autorizados' ? 15 : 10) + (mostrarAcciones ? 1 : 0)} /> : filas.map(r => (
+                {cargando && !datos ? <FilasEsqueleto columnas={(tipo === 'autorizados' ? 15 : 10) + (puedeEditar ? 1 : 0)} /> : filas.map(r => (
                   <tr key={r.id} className={r.vigente && r.activo !== false ? '' : 'inactivo'}>
                     {tipo === 'autorizados' ? (
                       <>
@@ -197,15 +192,14 @@ const Listas: React.FC<{ tipo?: TipoLista; incrustada?: boolean; soloMios?: bool
                     <td><InsigniaVigencia r={r} /></td>
                     <td className="num ocultar-movil">{r.ingresos > 0 && verIngresos && r.placa ? <Link to={`/historial?placa=${r.placa}`} title="Ver ingresos en el historial completo">{numero(r.ingresos)}</Link> : numero(r.ingresos)}</td>
                     <td className="ocultar-movil"><RegistradoPor r={r} /></td>
-                    {mostrarAcciones && <td className="acciones-celda">
-                      {puedeEditar ? tipo === 'autorizados'
+                    {puedeEditar && <td className="acciones-celda">
+                      {puedeGestionar && tipo === 'autorizados'
                         ? <AccionesPermiso r={r} onAccion={acciones.abrir} puedeEliminar={puede('padron:supervisar')} />
                         : <>
-                          <button className="btn btn-ghost btn-sm btn-icono" onClick={() => setEditando(r)} title="Editar" aria-label="Editar"><Edit3 size={15} /></button>
-                          <button className="btn btn-ghost btn-sm btn-icono" onClick={() => setRetirando(r)} title="Retirar de la lista" aria-label="Retirar"><Trash2 size={15} color="var(--alerta)" /></button>
-                        </>
-                        : <button type="button" className="btn btn-ghost btn-sm btn-icono" onClick={() => setFicha(r)} title="Editar institución y cargo"
-                          aria-label={`Editar institución y cargo de ${r.placa ? formatearPlaca(r.placa) : r.propietario ?? 'registro sin placa'}`}><Edit3 size={15} /></button>}
+                          <button type="button" className="btn btn-ghost btn-sm btn-icono" onClick={() => setEditando(r)} title="Editar registro"
+                            aria-label={`Editar registro de ${r.placa ? formatearPlaca(r.placa) : r.propietario ?? 'vehículo sin placa'}`}><Edit3 size={15} /></button>
+                          {puedeGestionar && <button type="button" className="btn btn-ghost btn-sm btn-icono" onClick={() => setRetirando(r)} title="Retirar de la lista" aria-label="Retirar"><Trash2 size={15} color="var(--alerta)" /></button>}
+                        </>}
                     </td>}
                   </tr>
                 ))}
@@ -222,10 +216,6 @@ const Listas: React.FC<{ tipo?: TipoLista; incrustada?: boolean; soloMios?: bool
         <FormularioLista tipo={tipo} registro={editando === 'nuevo' ? undefined : editando} onCerrar={() => setEditando(null)}
           onGuardado={() => { setEditando(null); recargar(true); notificar('exito', editando === 'nuevo' ? 'Registro agregado' : 'Cambios guardados'); }} />
       )}
-      {ficha && <EditarFichaLista tipo={tipo} registro={ficha} onCerrar={() => setFicha(null)} onGuardada={actualizado => {
-        setDatos(actual => actual?.map(r => r.id === actualizado.id ? actualizado : r) ?? actual);
-        setFicha(null); recargar(true); notificar('exito', 'Institución y cargo actualizados');
-      }} />}
       {importando && (
         <ImportarPermisos onCerrar={() => setImportando(false)} onImportado={r => {
           recargar(true);

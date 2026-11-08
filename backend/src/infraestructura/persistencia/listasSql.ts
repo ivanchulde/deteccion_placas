@@ -126,7 +126,7 @@ export const repositorioListasSql: RepositorioListas = {
   async actualizar(def, id, r) {
     const request = db().request().input('id', sql.Int, id);
     parametros(request, def, r);
-    await request.query(`
+    const resultado = await request.query(`
       UPDATE ${TABLA[def.tipo]} SET
         ruta_evidencia_vehiculo = CASE WHEN UPPER(REPLACE(REPLACE(COALESCE(placa, ''), '-', ''), ' ', '')) IS DISTINCT FROM COALESCE(@placa, '') THEN NULL ELSE ruta_evidencia_vehiculo END,
         ruta_evidencia_placa = CASE WHEN UPPER(REPLACE(REPLACE(COALESCE(placa, ''), '-', ''), ' ', '')) IS DISTINCT FROM COALESCE(@placa, '') THEN NULL ELSE ruta_evidencia_placa END,
@@ -134,7 +134,8 @@ export const repositorioListasSql: RepositorioListas = {
         fecha_evidencia_placa = CASE WHEN UPPER(REPLACE(REPLACE(COALESCE(placa, ''), '-', ''), ' ', '')) IS DISTINCT FROM COALESCE(@placa, '') THEN NULL ELSE fecha_evidencia_placa END,
         placa = @placa, fecha_vencimiento = @vence, fecha_actualizacion = SYSDATETIME(),
         ${columnasDe(def).map(c => `${c} = ${valorDe(c)}`).join(', ')}
-      WHERE id = @id`);
+      WHERE id = @id AND activo = TRUE RETURNING id`);
+    return resultado.recordset.length > 0;
   },
 
   async actualizarFicha(def, id, ficha: FichaLista) {

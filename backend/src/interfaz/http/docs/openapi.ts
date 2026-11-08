@@ -26,7 +26,7 @@ export interface CampoDoc {
 }
 
 /** publica: sin credenciales · sesion: JWT de cualquier usuario · servicio: token del motor ANPR */
-export type Acceso = 'publica' | 'sesion' | 'servicio' | Permiso | Permiso[];
+export type Acceso = 'publica' | 'sesion' | 'servicio' | Permiso | Permiso[] | { algunoDe: Permiso[] };
 
 export interface RutaDoc {
   metodo: Metodo;
@@ -64,6 +64,7 @@ function esquema(c: CampoDoc): Record<string, unknown> {
 
 function permisosDe(acceso: Acceso): Permiso[] {
   if (Array.isArray(acceso)) return acceso;
+  if (typeof acceso === 'object') return acceso.algunoDe;
   return acceso === 'publica' || acceso === 'sesion' || acceso === 'servicio' ? [] : [acceso];
 }
 
@@ -72,10 +73,14 @@ function textoAcceso(acceso: Acceso): string {
   if (acceso === 'sesion') return 'Acceso: **cualquier usuario con sesión**.';
   if (acceso === 'servicio') return 'Acceso: **servicio ANPR** (cabecera `X-Servicio-Token`).';
   const permisos = permisosDe(acceso);
+  const alternativos = typeof acceso === 'object' && !Array.isArray(acceso);
   const roles = Object.keys(NOMBRE_ROL)
-    .filter(r => permisos.every(p => rolesCon(p).includes(r as never)))
+    .filter(r => {
+      const permite = (p: Permiso) => rolesCon(p).includes(r as keyof typeof NOMBRE_ROL);
+      return alternativos ? permisos.some(permite) : permisos.every(permite);
+    })
     .map(r => NOMBRE_ROL[r as keyof typeof NOMBRE_ROL]);
-  return `Permiso requerido: ${permisos.map(p => `\`${p}\``).join(' + ')} · Roles: ${roles.join(', ')}.`;
+  return `Permiso requerido: ${permisos.map(p => `\`${p}\``).join(alternativos ? ' o ' : ' + ')} · Roles: ${roles.join(', ')}.`;
 }
 
 export function generarOpenApi(rutas: RutaDoc[] = RUTAS): Record<string, unknown> {
@@ -117,6 +122,7 @@ export function generarOpenApi(rutas: RutaDoc[] = RUTAS): Record<string, unknown
       responses: respuestas,
       security: r.acceso === 'publica' ? [] : r.acceso === 'servicio' ? [{ servicioAnpr: [] }] : [{ bearerAuth: [] }],
       ...(permisosDe(r.acceso).length ? { 'x-permisos': permisosDe(r.acceso) } : {}),
+      ...(typeof r.acceso === 'object' && !Array.isArray(r.acceso) ? { 'x-permisos-modo': 'alguno' } : {}),
     };
   }
 

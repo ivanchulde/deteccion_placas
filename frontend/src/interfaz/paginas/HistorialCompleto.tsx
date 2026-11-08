@@ -47,6 +47,7 @@ const MOVIMIENTOS: Record<string, string> = { '': 'Ingresos y salidas', ingreso:
 const SALIDAS: Record<string, string> = { '': 'Con y sin salida', si: 'Con salida registrada', no: 'Sin salida (siguen dentro)' };
 const ORIGENES: Record<string, string> = { '': 'Cámara y registro manual', camara: 'Solo cámara', manual: 'Solo registro manual' };
 const TAMANO = 50;
+const MAX_REGISTROS_PDF = 5000;
 const RE_HORA = /^\d{2}:\d{2}$/;
 
 const vehiculo = (d: Deteccion) => [d.vehiculo?.tipo ?? d.tipo_vehiculo, [d.vehiculo?.marca, d.vehiculo?.modelo].filter(Boolean).join(' '), d.vehiculo?.color]
@@ -132,8 +133,9 @@ const HistorialCompleto: React.FC = () => {
   const cerrados = SALIDAS[params.get('cerrados') ?? ''] ? params.get('cerrados') ?? '' : '';
   const horaDesde = RE_HORA.test(params.get('hora_desde') ?? '') ? params.get('hora_desde')! : '';
   const horaHasta = RE_HORA.test(params.get('hora_hasta') ?? '') ? params.get('hora_hasta')! : '';
-  // Sin fechas en la URL: el día de hoy, salvo que se llegue a consultar una placa, una cámara o «Todo»
-  const porOmision = !placa && !camara && !params.get('buscar') && !params.has('todo');
+  // Si el rango ya tiene un extremo, el otro queda abierto hasta que se indique una fecha.
+  const porOmision = !params.has('desde') && !params.has('hasta')
+    && !placa && !camara && !params.get('buscar') && !params.has('todo');
   const desde = params.get('desde') ?? (porOmision ? hoy : '');
   const hasta = params.get('hasta') ?? (porOmision ? hoy : '');
   const pagina = Math.max(1, Number(params.get('pagina') ?? 1) || 1);
@@ -172,10 +174,10 @@ const HistorialCompleto: React.FC = () => {
     unir_salidas: 'si',
   };
   const clave = JSON.stringify(consulta);
-  const { datos, cargando, error, recargar, setDatos } = useConsulta<Pagina<Deteccion>>(() => {
+  const { datos, cargando, error, recargar, setDatos } = useConsulta<Pagina<Deteccion> & { claveFiltros: string }>(() => {
     const t0 = performance.now();
     return api.get('/detecciones', { params: { ...consulta, pagina, tamano: TAMANO } })
-      .then(r => { setMsConsulta(Math.round(performance.now() - t0)); return r.data; });
+      .then(r => { setMsConsulta(Math.round(performance.now() - t0)); return { ...r.data, claveFiltros: clave }; });
   }, [clave, pagina]);
   const resumen = useConsulta<ResumenHistorial>(() => api.get('/detecciones/historial/resumen', { params: consulta }).then(r => r.data), [clave]);
   const { datos: camaras } = useConsulta<Camara[]>(() => api.get('/camaras').then(r => r.data), []);
@@ -221,18 +223,26 @@ const HistorialCompleto: React.FC = () => {
     void resumen.recargar(true);
   };
 
+  const filtrosPendientes = cargando || texto.trim() !== buscado || (datos !== null && datos.claveFiltros !== clave);
+  const exportacionDeshabilitada = Boolean(exportando) || filtrosPendientes || Boolean(error) || !datos?.total;
+  const excedeLimitePdf = (datos?.total ?? 0) > MAX_REGISTROS_PDF;
+  const pdfDeshabilitado = exportacionDeshabilitada || excedeLimitePdf;
   const exportar = async (formato: 'csv' | 'pdf') => {
+    if (formato === 'pdf' ? pdfDeshabilitado : exportacionDeshabilitada) return;
     setExportando(formato);
     try {
       const ruta = formato === 'pdf' ? '/detecciones/historial/reporte.pdf' : '/detecciones/exportar';
-      const r = await api.get(ruta, { params: consulta, responseType: 'blob' });
+      const r = await api.get(ruta, { params: consulta, responseType: 'blob', ...(formato === 'pdf' ? { timeout: 120000 } : {}) });
       descargarBlob(r.data, nombreDescarga(r.headers['content-disposition'], `historial_anpr.${formato}`));
     } catch (e) {
       notificar('error', 'No se pudo exportar', await mensajeErrorDescarga(e));
     } finally { setExportando(null); }
   };
-  const exportacionDeshabilitada = Boolean(exportando) || cargando || Boolean(error) || !datos?.total
-    || texto.trim() !== (params.get('buscar') ?? '');
+  const ayudaPdf = error ? 'No se pudo consultar el historial para generar el PDF.'
+    : filtrosPendientes ? 'Actualizando los resultados para el PDF…'
+      : excedeLimitePdf ? `El PDF admite hasta ${numero(MAX_REGISTROS_PDF)} registros. Acote las fechas o descargue el CSV de todos los resultados.`
+        : datos?.total ? `El PDF incluirá ${numero(datos.total)} ${datos.total === 1 ? 'registro que coincide' : 'registros que coinciden'} con los filtros.`
+          : 'No hay registros para generar el PDF con estos filtros.';
 
   const limpiar = () => {
     setTexto('');
@@ -277,8 +287,8 @@ const HistorialCompleto: React.FC = () => {
         <div className="fila">
           {esAdmin && <button type="button" className="btn btn-exito" onClick={() => setCreando(true)}><Plus size={15} /> Crear registro</button>}
           <Link to="/detecciones" className="btn btn-secondary"><LogOut size={15} /> Registro de Salidas</Link>
-          <button type="button" className="btn btn-secondary" onClick={() => void exportar('pdf')} disabled={exportacionDeshabilitada}
-            title="Descarga todos los registros que coinciden con los filtros"><FileText size={15} /> {exportando === 'pdf' ? 'Generando PDF…' : 'Descargar PDF'}</button>
+          <button type="button" className="btn btn-secondary" onClick={() => void exportar('pdf')} disabled={pdfDeshabilitado}
+            aria-describedby="h-ayuda-pdf" title="Descarga todos los registros que coinciden con los filtros"><FileText size={15} /> {exportando === 'pdf' ? 'Generando PDF…' : 'Descargar PDF'}</button>
           <button type="button" className="btn btn-navy" onClick={() => void exportar('csv')} disabled={exportacionDeshabilitada}>
             <Download size={15} /> {exportando === 'csv' ? 'Exportando…' : 'Exportar CSV'}</button>
           {puedeEliminarTodo && <button type="button" className="btn btn-danger" onClick={() => setEliminarTodos(true)}><Trash2 size={15} /> Eliminar todos</button>}
@@ -375,6 +385,7 @@ const HistorialCompleto: React.FC = () => {
               )}
             </div>
           )}
+          <p id="h-ayuda-pdf" className="historial-meta" role="status">{ayudaPdf}</p>
         </Tarjeta>
 
         {error && <AvisoFlotante tipo="error">{error}</AvisoFlotante>}

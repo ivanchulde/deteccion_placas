@@ -26,14 +26,14 @@ import { actorDe, controlador, idDe } from '../respuesta';
  *                           y el resumen de lo que otorgó cada gestor
  *   DELETE /:id/definitivo  elimina un permiso retirado o vencido sin ingresos en el historial
  *
- * Lectura: listas:ver. Alta: padron:agregar o alertas:restringir. Edición y retiro: el permiso de cada
- * lista (padron:gestionar para la lista blanca, alertas:gestionar para la lista negra). Las reglas están en dominio/listas.ts y los
- * casos de uso en aplicacion/listas.ts.
+ * Lectura: listas:ver. Alta: padron:agregar o alertas:restringir. El PUT acepta
+ * listas:editar-registro o el permiso de gestión de su lista (validado en el caso de uso).
+ * Retiro, reactivación e importación conservan sus permisos de gestión.
  */
 function crearRouter(def: DefinicionLista): Router {
   const router = Router();
   const lectura = [authMiddleware, requierePermiso('listas:ver')];
-  const edicion = [authMiddleware, requierePermiso(def.permisoEdicion)];
+  const gestion = [authMiddleware, requierePermiso(def.permisoEdicion)];
   const alta = [authMiddleware, requierePermiso(def.tipo === 'alertas' ? 'alertas:restringir' : 'padron:agregar')];
   const contexto = `LISTAS ${def.nombre}`;
   router.patch('/:id(\\d+)/ficha', authMiddleware, requierePermiso('listas:editar-ficha'),
@@ -63,13 +63,13 @@ function crearRouter(def: DefinicionLista): Router {
     res.json(await listas.misPermisos(req.query, actorDe(req)));
   }));
 
-  if (def.tipo === 'autorizados') router.post('/:id(\\d+)/reactivar', ...edicion, controlador(contexto, 'No se pudo activar el permiso.', async (req, res) => {
+  if (def.tipo === 'autorizados') router.post('/:id(\\d+)/reactivar', ...gestion, controlador(contexto, 'No se pudo activar el permiso.', async (req, res) => {
     const id = idDe(req, res);
     if (id !== null) res.json({ message: 'Permiso activado.', item: await listas.reactivar(def, id, req.body?.motivo, actorDe(req)) });
   }));
 
   // Importación desde Excel/CSV: el cuerpo es el archivo; ?simular=si devuelve la vista previa sin guardar
-  if (def.tipo === 'autorizados') router.post('/importar', ...edicion, express.raw({ type: () => true, limit: '5mb' }),
+  if (def.tipo === 'autorizados') router.post('/importar', ...gestion, express.raw({ type: () => true, limit: '5mb' }),
     controlador(contexto, 'No se pudo importar el archivo.', async (req, res) => {
       const contenido = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
       res.json(await listas.importar(def, contenido, req.query.archivo, actorDe(req), req.query.simular === 'si'));
@@ -106,12 +106,12 @@ function crearRouter(def: DefinicionLista): Router {
     });
   }));
 
-  router.put('/:id(\\d+)', ...edicion, controlador(contexto, 'No se pudo actualizar el registro.', async (req, res) => {
+  router.put('/:id(\\d+)', authMiddleware, controlador(contexto, 'No se pudo actualizar el registro.', async (req, res) => {
     const id = idDe(req, res);
     if (id !== null) res.json({ message: 'Registro actualizado.', item: await listas.editar(def, id, req.body, actorDe(req)) });
   }));
 
-  router.delete('/:id(\\d+)', ...edicion, controlador(contexto, 'No se pudo retirar el registro.', async (req, res) => {
+  router.delete('/:id(\\d+)', ...gestion, controlador(contexto, 'No se pudo retirar el registro.', async (req, res) => {
     const id = idDe(req, res);
     if (id === null) return;
     await listas.retirar(def, id, req.body?.motivo, actorDe(req));
