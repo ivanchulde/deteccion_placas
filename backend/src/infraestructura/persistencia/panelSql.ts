@@ -73,6 +73,8 @@ export const repositorioPanelSql: RepositorioPanel = {
         WHERE d.estado_validacion = 'alerta' ORDER BY d.fecha_hora_ingreso DESC`),
       q(`
         SELECT
+          (SELECT COUNT(*) FROM ListaBlanca WHERE activo = 1) AS lista_blanca,
+          (SELECT COUNT(*) FROM ListaNegra WHERE activo = 1) AS lista_negra,
           (SELECT COUNT(*) FROM ListaBlanca WHERE activo = 1 AND (fecha_vencimiento IS NULL OR fecha_vencimiento >= ${h})) AS autorizados_vigentes,
           (SELECT COUNT(*) FROM ListaBlanca WHERE activo = 1 AND fecha_vencimiento >= ${h}
              AND fecha_vencimiento <= DATEADD(DAY, @dias, ${h})) AS autorizados_por_vencer,

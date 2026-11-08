@@ -13,7 +13,7 @@ export interface ItemMenu {
   /** Permiso que habilita la entrada (la API aplica el mismo control); sin permiso: basta la sesión */
   permiso?: Permiso;
   /** Clave del contador que se muestra junto al enlace */
-  contador?: 'revision' | 'solicitudes';
+  contador?: 'revision';
   oculto?: boolean;
 }
 
@@ -38,7 +38,7 @@ export const MENU: GrupoMenu[] = [
     items: [
       { ruta: '/listas/autorizados', titulo: 'Lista blanca', descripcion: 'Vehículos autorizados a ingresar, con vigencia y horario', icono: <ShieldCheck size={18} />, permiso: 'listas:ver' },
       { ruta: '/listas/alertas', titulo: 'Lista negra', descripcion: 'Placas con alerta de seguridad: su paso genera una alarma', icono: <ShieldAlert size={18} />, permiso: 'listas:ver' },
-      { ruta: '/solicitudes', titulo: 'Gestión de Permisos', descripcion: 'Permisos otorgados y solicitudes de visitas, proveedores y vehículos sin permiso', icono: <FileCheck2 size={18} />, permiso: 'solicitudes:resolver', contador: 'solicitudes' },
+      { ruta: '/solicitudes', titulo: 'Gestión de Permisos', descripcion: 'Permisos otorgados por todos los usuarios', icono: <FileCheck2 size={18} />, permiso: 'padron:supervisar' },
       { ruta: '/detecciones', titulo: 'Registro de Salidas', descripcion: 'Registros completos con salida: hoja de control, validación y exportación', icono: <LogOut size={18} />, permiso: 'operacion:monitorear' },
       { ruta: '/historial', titulo: 'Historial Completo', descripcion: 'Todos los pasos registrados, con consulta inteligente por placa, fecha, hora y estado', icono: <History size={18} />, permiso: 'operacion:monitorear', contador: 'revision' },
     ],

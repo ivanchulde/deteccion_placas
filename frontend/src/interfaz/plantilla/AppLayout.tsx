@@ -51,17 +51,6 @@ function useColaRevision(activo: boolean): number {
   return n;
 }
 
-/** Solicitudes de acceso pendientes (para quien resuelve: las de otros; para el resto: las propias). */
-function useSolicitudesPendientes(activo: boolean): number {
-  const [n, setN] = useState(0);
-  const cargar = () => { if (activo) api.get('/solicitudes-acceso/resumen').then(r => setN(r.data.pendientes)).catch(() => undefined); };
-  const diferido = useDiferido(cargar, 800);
-  useEffect(() => { cargar(); }, [activo]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEvento('solicitudes:actualizadas', diferido);
-  useReconexion(diferido);
-  return n;
-}
-
 const Sidebar: React.FC<{ colapsado: boolean; onColapsar: () => void; abiertoMovil: boolean; onCerrarMovil: () => void }> =
   ({ colapsado, onColapsar, abiertoMovil, onCerrarMovil }) => {
     const { user, puede } = useAuth();
@@ -86,9 +75,8 @@ const Sidebar: React.FC<{ colapsado: boolean; onColapsar: () => void; abiertoMov
       : [...actual, c]));
     useEvento<{ id: number }>('camara:eliminada', ({ id }) => setCamaras(actual => actual.filter(c => c.id !== id)));
     const revision = useColaRevision(!!user && puede('operacion:monitorear'));
-    const solicitudes = useSolicitudesPendientes(!!user && user.rol !== 'GestorPermisos' && puede('solicitudes:resolver'));
     if (!user) return null;
-    const contadores = { revision, solicitudes };
+    const contadores = { revision };
     return (
       <aside className={`sidebar${colapsado ? ' colapsado' : ''}${abiertoMovil ? ' abierto-movil' : ''}`} aria-label="Menú principal">
         <div className="sidebar-marca">

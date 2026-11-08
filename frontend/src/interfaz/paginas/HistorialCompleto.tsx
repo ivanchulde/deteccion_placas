@@ -40,6 +40,7 @@ const ESTADOS: Record<string, { etiqueta: string; estado?: string }> = {
   '': { etiqueta: 'Todos los estados' },
   autorizados: { etiqueta: 'Autorizados', estado: 'autorizado' },
   no_autorizados: { etiqueta: 'No autorizados', estado: 'no_reconocido,alerta' },
+  no_registrados: { etiqueta: 'No registrados', estado: 'no_reconocido' },
   alertas: { etiqueta: 'Lista negra', estado: 'alerta' },
   pendientes: { etiqueta: 'Pendientes de autorización', estado: 'pendiente_revision' },
 };

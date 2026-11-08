@@ -150,35 +150,22 @@ const ListaSolicitudesAcceso: React.FC<{ incrustada?: boolean; onVerPadron?: () 
   );
 };
 
-/**
- * El administrador ve aquí, además de las solicitudes, los permisos que otorgaron TODOS los
- * usuarios (gestores incluidos), con los retirados: un gestor concede la mayoría directamente, sin
- * solicitud, y esos permisos no aparecían en esta pantalla. Las notificaciones de una solicitud
- * (?id=) abren la pestaña de solicitudes.
- */
-const SolicitudesAdministrador: React.FC = () => {
-  const [params, setParams] = useSearchParams();
-  const { datos: pendientes } = useConsulta<number>(() => api.get('/solicitudes-acceso/resumen').then(r => r.data.pendientes), []);
-  const seccion = params.get('seccion') === 'solicitudes' || params.has('id') ? 'solicitudes' : 'permisos';
-  return <div className="pagina"><div className="pila">
-    <Pestanas<'permisos' | 'solicitudes'> valor={seccion} onCambiar={destino => {
-      const siguientes = new URLSearchParams();
-      siguientes.set('seccion', destino);
-      setParams(siguientes);
-    }} opciones={[
-      { valor: 'permisos', etiqueta: 'Permisos otorgados por todos los usuarios', icono: <ShieldCheck size={15} /> },
-      { valor: 'solicitudes', etiqueta: 'Solicitudes', icono: <Clock size={15} />, num: pendientes ?? undefined },
-    ]} />
-    {seccion === 'permisos' ? <PermisosUsuarios incrustada /> : <ListaSolicitudesAcceso incrustada />}
-  </div></div>;
-};
-
 /** En garita también se consultan los permisos concedidos directamente, sin crear una solicitud. */
 const SolicitudesAcceso: React.FC<{ incrustada?: boolean; onVerPadron?: () => void }> = props => {
   const { puede } = useAuth();
   const [params, setParams] = useSearchParams();
   if (esVistaGestionPermisos(puede)) return <GestionPermisos />;
-  if (!props.incrustada && puede('padron:supervisar')) return <SolicitudesAdministrador />;
+  if (!props.incrustada && puede('padron:supervisar')) {
+    // Los avisos enlazan la solicitud por ID. El menú abre directamente los permisos otorgados.
+    const idSolicitud = Number(params.get('id'));
+    if (puede('solicitudes:resolver') && Number.isSafeInteger(idSolicitud) && idSolicitud > 0) {
+      return <div className="pagina"><div className="pila">
+        <div><Link to="/solicitudes" className="btn btn-secondary">Volver a Gestión de Permisos</Link></div>
+        <ListaSolicitudesAcceso incrustada />
+      </div></div>;
+    }
+    return <PermisosUsuarios />;
+  }
   const consultaPermisos = !props.incrustada && puede('listas:ver') && !puede('solicitudes:resolver');
   if (!consultaPermisos) return <ListaSolicitudesAcceso {...props} />;
   const seccion = params.get('seccion') === 'solicitudes' || params.has('id') ? 'solicitudes' : 'permisos';

@@ -195,7 +195,15 @@ export interface ResumenPanel {
   camaras: { id: number; nombre: string; ubicacion: string; activa: boolean; estado: Camara['estado']; ultimo_ping: string | null; tiempo_respuesta_ms: number | null; detecciones_hoy: number }[];
   cola_revision: number;
   ultimas_alertas: Deteccion[];
-  listas: { autorizados_vigentes: number; autorizados_por_vencer: number; autorizados_vencidos: number; alertas_vigentes: number; dias_aviso: number };
+  listas: {
+    lista_blanca: number;
+    lista_negra: number;
+    autorizados_vigentes: number;
+    autorizados_por_vencer: number;
+    autorizados_vencidos: number;
+    alertas_vigentes: number;
+    dias_aviso: number;
+  };
 }
 
 /** Enlace del motor con el flujo principal de la cámara (lo informa el lector RTSP del motor). */

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Activity, AlertTriangle, ArrowRight, CarFront, ClipboardPlus, Clock, History, LogOut, MonitorPlay, ShieldAlert, ShieldCheck,
+  Activity, ArrowRight, CarFront, CircleHelp, ClipboardPlus, History, LogOut, MonitorPlay, ShieldCheck, ShieldX, Siren,
   TrendingDown, TrendingUp,
 } from 'lucide-react';
 import api from '../../infraestructura/api';
@@ -63,22 +63,21 @@ const Variacion: React.FC<{ hoy: number; ayer: number }> = ({ hoy, ayer }) => {
 
 /* ─────────────── Panel operativo (todos los roles) ─────────────── */
 
-const KpisDelDia: React.FC<{ r: ResumenPanel | null; cargando: boolean }> = ({ r, cargando }) => {
+const KpisAdmin: React.FC<{ r: ResumenPanel | null; cargando: boolean }> = ({ r, cargando }) => {
   const navigate = useNavigate();
   const hoy = r?.hoy;
   return (
     <div className="grid-kpi">
-      <Kpi etiqueta="Ingresos hoy" valor={numero(hoy?.total)} icono={<CarFront size={17} />} cargando={cargando}
+      <Kpi etiqueta="Ingresos hoy" valor={numero(hoy?.total)} icono={<CarFront size={22} aria-hidden />} cargando={cargando}
         pie={r && <Variacion hoy={r.hoy.total} ayer={r.ayer_misma_hora} />} onClick={() => navigate('/monitoreo')} />
-      <Kpi etiqueta="Autorizados" valor={numero(hoy?.autorizados)} icono={<ShieldCheck size={17} />} color="var(--autorizado)" fondo="var(--autorizado-bg)" cargando={cargando}
-        pie={hoy && hoy.total > 0 ? `${Math.round((hoy.autorizados / hoy.total) * 100)} % del total` : 'Padrón institucional'}
-        onClick={() => navigate('/monitoreo?estado=autorizado')} />
-      <Kpi etiqueta="Por autorizar" valor={numero(r?.cola_revision)} icono={<Clock size={17} />} color="var(--pendiente)" fondo="var(--pendiente-bg)" cargando={cargando}
-        pie="Lecturas dudosas o sin lectura" onClick={() => navigate('/monitoreo?estado=pendiente_revision&validado=no')} />
-      <Kpi etiqueta="No registrados" valor={numero(hoy?.no_registrados)} icono={<AlertTriangle size={17} />} color="var(--no-registrado)" fondo="var(--no-registrado-bg)" cargando={cargando}
-        pie="Fuera del padrón y sin alerta" onClick={() => navigate('/monitoreo?estado=no_reconocido')} />
-      <Kpi etiqueta="Alertas hoy" valor={numero(hoy?.alertas)} icono={<ShieldAlert size={17} />} color="var(--alerta)" fondo="var(--alerta-bg)" cargando={cargando}
-        pie={`${numero(r?.listas.alertas_vigentes)} placas en la lista`} onClick={() => navigate('/monitoreo?estado=alerta&hoy=1')} />
+      <Kpi etiqueta="Lista blanca" valor={numero(r?.listas.lista_blanca)} icono={<ShieldCheck size={22} aria-hidden />} color="var(--autorizado)" fondo="var(--autorizado-bg)" cargando={cargando}
+        pie="Registros sin retirar" onClick={() => navigate('/listas/autorizados')} />
+      <Kpi etiqueta="Lista negra" valor={numero(r?.listas.lista_negra)} icono={<ShieldX size={22} aria-hidden />} color="var(--text-2)" cargando={cargando}
+        pie="Registros sin retirar" onClick={() => navigate('/listas/alertas')} />
+      <Kpi etiqueta="No registrados" valor={numero(hoy?.no_registrados)} icono={<CircleHelp size={22} aria-hidden />} color="var(--no-registrado)" fondo="var(--no-registrado-bg)" cargando={cargando}
+        pie="Detectados hoy fuera de las listas" onClick={() => navigate('/historial?estado=no_registrados')} />
+      <Kpi etiqueta="Alertas hoy" valor={numero(hoy?.alertas)} icono={<Siren size={22} aria-hidden />} color="var(--alerta)" fondo="var(--alerta-bg)" cargando={cargando}
+        pie="Detecciones con alerta" onClick={() => navigate('/historial?estado=alertas')} />
     </div>
   );
 };
@@ -266,7 +265,7 @@ const PanelGestion: React.FC = () => {
       </div>
       {error && <AvisoFlotante tipo="error" style={{ marginBottom: 16 }}>{error}</AvisoFlotante>}
       <div className="pila">
-        <KpisDelDia r={r} cargando={cargando} />
+        <KpisAdmin r={r} cargando={cargando} />
         {r
           ? <div className="grid-2"><DistribucionHoy r={r} /><UltimosSieteDias r={r} /></div>
           : <Tarjeta titulo="Distribución de ingresos"><Cargando /></Tarjeta>}

@@ -46,7 +46,7 @@ function aCsv(filas: RegistroLista[]): Blob {
  * usuario, estado y texto, y permite crear, editar, desactivar, activar, renovar e importar permisos
  * (acciones compartidas con el gestor: componentes/AccionesPermiso.tsx).
  */
-const PermisosUsuarios: React.FC<{ incrustada?: boolean }> = ({ incrustada }) => {
+const PermisosUsuarios: React.FC = () => {
   const notificar = useNotificar();
   const [params, setParams] = useSearchParams();
   const usuario = params.get('usuario') ?? '';
@@ -80,11 +80,10 @@ const PermisosUsuarios: React.FC<{ incrustada?: boolean }> = ({ incrustada }) =>
   }), { activos: 0, vencidos: 0, retirados: 0, por_vencer: 0 }), [datos]);
 
   return (
-    <div className={incrustada ? undefined : 'pagina'}>
+    <div className="pagina">
       <div className="encabezado-pagina">
         <div>
-          {/* Dentro de Gestión de Permisos la pestaña ya da el título */}
-          {!incrustada && <h2>Permisos por usuario</h2>}
+          <h2>Permisos otorgados por todos los usuarios</h2>
           <p>Permisos de la lista blanca otorgados por cada gestor (vigentes, vencidos y desactivados) · cada cambio queda en la auditoría</p>
         </div>
         <div className="fila">
