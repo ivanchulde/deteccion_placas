@@ -1,0 +1,9 @@
+# Saltos de línea LF en todos los sistemas (también al clonar en Windows): los scripts y archivos de
+# configuración se montan o copian dentro de contenedores Linux
+* text=auto eol=lf
+
+*.pt   binary
+*.png  binary
+*.ico  binary
+*.mp3  binary
+*.mp4  binary

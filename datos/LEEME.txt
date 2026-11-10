@@ -1,0 +1,10 @@
+Carpeta para la lista blanca inicial (vehículos autorizados).
+
+El archivo lista_blanca.sql NO está en el repositorio porque contiene datos personales
+(nombres, cédulas y placas). Se entrega aparte, por un medio privado (USB o carpeta compartida
+interna). Cópielo aquí como:
+
+    datos/lista_blanca.sql
+
+y siga la sección «Cargar la lista blanca» del README.md. Git ignora todo lo que se ponga en
+esta carpeta salvo este LEEME, así que no se sube por error.

@@ -1,0 +1,28 @@
+# Secretos: solo se versiona la plantilla .env.example
+.env
+**/.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Datos personales: la lista blanca (y cualquier exportación) se entrega aparte, nunca en git
+datos/*
+!datos/LEEME.txt
+*.sql.gz
+*.dump
+*.csv
+*.xlsx
+
+# Dependencias y compilados (se generan dentro de las imágenes)
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+
+# Datos operativos: evidencia, respaldos, paquetes y registros
+media/
+respaldos/
+backups/
+paquete/
+NOVANPR_produccion_*/
+*.log

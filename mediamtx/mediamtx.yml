@@ -1,0 +1,69 @@
+###############################################################################
+# MediaMTX · servidor de medios del Sistema ANPR
+#
+# MediaMTX v1.21 (imagen fijada en docker-compose.yml).
+#
+# - Cada cámara registrada se publica como la ruta `cam_<id>` (flujo principal, el que procesa
+#   el motor ANPR) y, si tiene flujo de vista, `cam_<id>_vista` (flujo secundario para el
+#   navegador). Las rutas NO se escriben aquí: el backend las crea, actualiza y elimina por la
+#   API (puerto 9997, solo red interna de Docker) a partir de la tabla Camaras, descifrando las
+#   credenciales solo para entregarlas. Así no hay credenciales RTSP en este archivo.
+# - MediaMTX mantiene UNA conexión con cada flujo de la cámara y la reparte: el motor ANPR la lee
+#   por RTSP y los navegadores por WebRTC (baja latencia, sin transcodificar). WebRTC entrega
+#   H.264 en cualquier navegador; H.265 solo en navegadores con decodificador por hardware
+#   (Chrome 136+, Safari): por eso la vista usa el flujo secundario en H.264.
+# - Toda lectura se autoriza contra el backend (/api/medios/autorizar):
+#     · motor ANPR (RTSP): usuario "anpr" + ANPR_SERVICE_TOKEN
+#     · navegador (WebRTC): ticket de 60 s emitido a un usuario con sesión válida
+#   Publicar en el servidor está prohibido.
+###############################################################################
+
+logLevel: info
+readTimeout: 10s
+writeTimeout: 10s
+writeQueueSize: 512
+
+authMethod: http
+authHTTPAddress: http://backend:5000/api/medios/autorizar
+# La API y las métricas no salen de la red interna de Docker (sin puerto publicado)
+authHTTPExclude:
+- action: api
+- action: metrics
+
+api: yes
+apiAddress: :9997
+metrics: yes
+metricsAddress: :9998
+
+# RTSP (lectura del motor ANPR y fuentes de las cámaras)
+rtsp: yes
+rtspTransports: [tcp]
+rtspAddress: :8554
+
+# WebRTC (video en el navegador, latencia ~0,2–0,5 s)
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigins: ['*']
+webrtcLocalUDPAddress: :8189
+# Respaldo por TCP cuando la red bloquea UDP
+webrtcLocalTCPAddress: :8189
+# Las IP del contenedor no son alcanzables desde el navegador: se anuncian las del host
+# (variable MTX_WEBRTCADDITIONALHOSTS en docker-compose, a partir de WEBRTC_HOSTS del .env)
+webrtcIPsFromInterfaces: no
+webrtcAdditionalHosts: [127.0.0.1]
+
+# Protocolos que el sistema no usa
+rtmp: no
+hls: no
+srt: no
+moq: no
+playback: no
+
+pathDefaults:
+  rtspTransport: tcp
+  # La cámara solo se abre mientras alguien la lee (el motor ANPR la mantiene abierta)
+  sourceOnDemand: yes
+  sourceOnDemandStartTimeout: 10s
+  sourceOnDemandCloseAfter: 15s
+
+paths: {}

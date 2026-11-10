@@ -1,0 +1,302 @@
+import React, { Suspense, useEffect, useRef, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Bell, Camera, ChevronDown, ChevronsLeft, ChevronsRight, Clock, GripVertical, KeyRound, LogOut, Menu, Moon, RefreshCw, Shield, Sun, UserCircle, Volume2, VolumeX, Wifi, WifiOff,
+} from 'lucide-react';
+import api from '../../infraestructura/api';
+import type { Camara } from '../../dominio/tipos';
+import { useAuth } from '../../aplicacion/AuthContext';
+import { useEvento, useReconexion, useTiempoReal } from '../../aplicacion/tiempoReal';
+import { useDiferido, useTic, useVersionNueva } from '../../aplicacion/hooks';
+import { iniciales, ROLES } from '../../dominio/formato';
+import { Cargando } from '../componentes/ui';
+import { AvisosAcceso } from '../componentes/AvisosAcceso';
+import { CampanaNotificaciones } from '../componentes/CentroNotificaciones';
+import { alCambiarSonido, fijarSonido, sonidoActivo } from '../../infraestructura/avisos';
+import { itemDeRuta, menuPara, pestanasPara } from './navegacion';
+import logo from '../../assets/ecu911.png';
+
+const CLAVE_COLAPSO = 'anpr_menu_colapsado';
+const CLAVE_CAMARAS_ABIERTAS = 'anpr_sidebar_camaras_abiertas';
+const CLAVE_TEMA = 'anpr_tema';
+
+const BotonTema: React.FC = () => {
+  const [oscuro, setOscuro] = useState(() => {
+    try { return localStorage.getItem(CLAVE_TEMA) === 'oscuro'; } catch { return false; }
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = oscuro ? 'dark' : 'light';
+    try { localStorage.setItem(CLAVE_TEMA, oscuro ? 'oscuro' : 'claro'); } catch { /* preferencia no disponible */ }
+  }, [oscuro]);
+  return (
+    <button className="btn btn-ghost btn-sm btn-icono" onClick={() => setOscuro(v => !v)}
+      title={oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'} aria-label={oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}>
+      {oscuro ? <Sun size={17} /> : <Moon size={17} />}
+    </button>
+  );
+};
+
+/** Pendientes de revisión (contador del menú), actualizado por eventos en tiempo real. */
+function useColaRevision(activo: boolean): number {
+  const [n, setN] = useState(0);
+  const cargar = () => { if (activo) api.get('/detecciones', { params: { estado: 'pendiente_revision', validado: 'no', tamano: 5 } })
+    .then(r => setN(r.data.total)).catch(() => undefined); };
+  const diferido = useDiferido(cargar, 1500);
+  useEffect(() => { cargar(); }, [activo]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEvento('deteccion:nueva', diferido);
+  useEvento('deteccion:actualizada', diferido);
+  useEvento('deteccion:eliminada', diferido);
+  useEvento('deteccion:eliminadas', diferido);
+  useReconexion(diferido);
+  return n;
+}
+
+const Sidebar: React.FC<{ colapsado: boolean; onColapsar: () => void; abiertoMovil: boolean; onCerrarMovil: () => void }> =
+  ({ colapsado, onColapsar, abiertoMovil, onCerrarMovil }) => {
+    const { user, puede } = useAuth();
+    const navigate = useNavigate();
+    const { pathname } = useLocation();
+    const [camaras, setCamaras] = useState<Camara[]>([]);
+    const [camarasAbiertas, setCamarasAbiertas] = useState(() => {
+      try { return localStorage.getItem(CLAVE_CAMARAS_ABIERTAS) === '1'; } catch { return false; }
+    });
+    const alternarCamaras = () => setCamarasAbiertas(actual => {
+      try { localStorage.setItem(CLAVE_CAMARAS_ABIERTAS, actual ? '0' : '1'); } catch { /* sin almacenamiento */ }
+      return !actual;
+    });
+    useEffect(() => {
+      if (!user || !puede('operacion:monitorear')) return;
+      let vigente = true;
+      api.get('/camaras').then(r => { if (vigente) setCamaras(r.data); }).catch(() => undefined);
+      return () => { vigente = false; };
+    }, [user, puede, pathname]);
+    useEvento<Camara>('camara:actualizada', c => setCamaras(actual => actual.some(x => x.id === c.id)
+      ? actual.map(x => x.id === c.id ? { ...x, ...c } : x)
+      : [...actual, c]));
+    useEvento<{ id: number }>('camara:eliminada', ({ id }) => setCamaras(actual => actual.filter(c => c.id !== id)));
+    const revision = useColaRevision(!!user && puede('operacion:monitorear'));
+    if (!user) return null;
+    const contadores = { revision };
+    return (
+      <aside className={`sidebar${colapsado ? ' colapsado' : ''}${abiertoMovil ? ' abierto-movil' : ''}`} aria-label="Menú principal">
+        <div className="sidebar-marca">
+          <div className="logo"><img src={logo} alt="ECU 911" /></div>
+          <div className="texto"><strong>ECU 911</strong><span>Sistema ANPR</span></div>
+        </div>
+        <nav className="sidebar-nav">
+          {menuPara(puede).map(g => (
+            <div className="sidebar-grupo" key={g.titulo}>
+              <div className="sidebar-grupo-titulo">{g.titulo.toLocaleUpperCase('es')}</div>
+              {g.items.map(i => (
+                <React.Fragment key={i.ruta}>
+                  <div className={i.ruta === '/camaras' && puede('operacion:monitorear') ? 'sidebar-item-con-submenu' : undefined}>
+                  <NavLink to={i.ruta} end={i.ruta === '/'} onClick={() => {
+                    if (i.ruta === '/camaras' && puede('operacion:monitorear')) alternarCamaras();
+                    onCerrarMovil();
+                  }}
+                    className={({ isActive }) => `sidebar-link sidebar-modulo${isActive ? ' activo' : ''}`} title={i.titulo.toLocaleUpperCase('es')}>
+                    {i.icono}
+                    <span className="etiqueta">{i.titulo.toLocaleUpperCase('es')}</span>
+                    {i.contador && contadores[i.contador] > 0 && (
+                      <span className="contador" aria-label={`${contadores[i.contador]} pendientes`}>{contadores[i.contador] > 99 ? '99+' : contadores[i.contador]}</span>
+                    )}
+                  </NavLink>
+                  {i.ruta === '/camaras' && puede('operacion:monitorear') && (
+                    <button type="button" className="sidebar-desplegar-camaras" onClick={alternarCamaras}
+                      aria-label={camarasAbiertas ? 'Ocultar cámaras registradas' : 'Mostrar cámaras registradas'}
+                      title={camarasAbiertas ? 'Ocultar cámaras registradas' : 'Mostrar cámaras registradas'}
+                      aria-expanded={camarasAbiertas} aria-controls="sidebar-camaras-registradas">
+                      <ChevronDown size={15} aria-hidden />
+                    </button>
+                  )}
+                  </div>
+                  {i.ruta === '/camaras' && puede('operacion:monitorear') && camarasAbiertas && (
+                    <div id="sidebar-camaras-registradas" className="sidebar-submenu-camaras" role="region" aria-label="Cámaras registradas">
+                      <div className="sidebar-submenu-titulo">CÁMARAS REGISTRADAS</div>
+                      {camaras.map(c => (
+                        <button key={c.id} type="button" className={`sidebar-link sidebar-camara${c.activa ? '' : ' deshabilitada'}`}
+                          draggable={c.activa}
+                          onDragStart={e => { e.dataTransfer.setData('application/x-anpr-camera', String(c.id)); e.dataTransfer.effectAllowed = 'copy'; }}
+                          onClick={() => { if (window.location.pathname !== '/monitoreo') navigate('/monitoreo'); }}
+                          title={colapsado ? `${c.nombre} · ${c.direccion}` : `Arrastre ${c.nombre} a una celda de Vista cuadrícula · ${c.direccion}`}>
+                          <GripVertical size={14} className="sidebar-camara-arrastre" />
+                          <Camera size={16} />
+                          <span className="etiqueta">{c.nombre}<small>{c.direccion === 'salida' ? 'Salida' : 'Ingreso'}{c.activa ? '' : ' · Deshabilitada'}</small></span>
+                        </button>
+                      ))}
+                      {camaras.length === 0 && !colapsado && <span className="sidebar-camaras-vacio">Sin cámaras registradas</span>}
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div className="sidebar-pie">
+          <button className="sidebar-colapsar" onClick={onColapsar} aria-label={colapsado ? 'Expandir menú' : 'Contraer menú'}>
+            {colapsado ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}<span>Contraer menú</span>
+          </button>
+        </div>
+      </aside>
+    );
+  };
+
+/** Tiempo restante de sesión; se destaca en los últimos 10 minutos. */
+const RelojSesion: React.FC = () => {
+  const { expira } = useAuth();
+  useTic(30000);
+  if (!expira) return null;
+  const min = Math.max(0, Math.round((expira - Date.now()) / 60000));
+  const texto = min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min` : `${min} min`;
+  return (
+    <span className={`sesion-reloj${min <= 10 ? ' aviso' : ''}`} title="Tiempo restante de la sesión">
+      <Clock size={13} /> Sesión: {texto}
+    </span>
+  );
+};
+
+/** Activa o silencia el sonido de los avisos de acceso (preferencia del navegador). */
+const BotonSonido: React.FC = () => {
+  const [activo, setActivo] = useState(sonidoActivo);
+  useEffect(() => alCambiarSonido(setActivo), []);
+  return (
+    <button className="btn btn-ghost btn-sm btn-icono" onClick={() => fijarSonido(!activo)}
+      title={activo ? 'Silenciar el sonido de los avisos' : 'Activar el sonido de los avisos'} aria-label={activo ? 'Silenciar avisos' : 'Activar sonido de avisos'}>
+      {activo ? <Volume2 size={17} /> : <VolumeX size={17} color="var(--alerta)" />}
+    </button>
+  );
+};
+
+const MenuUsuario: React.FC = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const boton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setAbierto(false); };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setAbierto(false); boton.current?.focus(); }
+    };
+    document.addEventListener('mousedown', fuera);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', fuera); document.removeEventListener('keydown', esc); };
+  }, [abierto]);
+  if (!user) return null;
+  return (
+    <div ref={ref} className="menu-usuario">
+      <button ref={boton} type="button" className="usuario-boton" onClick={() => setAbierto(a => !a)} aria-expanded={abierto} aria-haspopup="menu"
+        aria-controls={abierto ? 'menu-cuenta' : undefined} aria-label={`Menú de usuario de ${user.nombre}`} title={user.nombre}>
+        <span className="avatar" aria-hidden="true">{iniciales(user.nombre)}</span>
+        <span className="usuario-datos">
+          <strong>{user.nombre}</strong>
+          <span className="usuario-rol"><Shield size={12} aria-hidden="true" />{ROLES[user.rol]}</span>
+        </span>
+        <ChevronDown size={15} className="usuario-desplegar" aria-hidden="true" />
+      </button>
+      {abierto && (
+        <div id="menu-cuenta" className="menu" role="menu" aria-label="Cuenta de usuario">
+          <div className="menu-cabecera">
+            <strong>{user.nombre}</strong><span>{user.email}</span>
+            <small>{ROLES[user.rol]}</small>
+          </div>
+          <button className="menu-item" role="menuitem" onClick={() => { setAbierto(false); navigate('/perfil'); }}><UserCircle size={16} /> Mi perfil</button>
+          <button className="menu-item" role="menuitem" onClick={() => { setAbierto(false); navigate('/notificaciones'); }}><Bell size={16} /> Notificaciones</button>
+          <button className="menu-item" role="menuitem" onClick={() => { setAbierto(false); navigate('/perfil#contrasena'); }}><KeyRound size={16} /> Cambiar contraseña</button>
+          <button className="menu-item peligro" role="menuitem" onClick={() => { logout(); navigate('/login', { replace: true }); }}><LogOut size={16} /> Cerrar sesión</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** Barra de pestañas estilo IDE: accesos directos a las vistas de uso diario del rol. */
+const BarraPestanas: React.FC = () => {
+  const { puede } = useAuth();
+  const pestanas = pestanasPara(puede);
+  if (!pestanas.length) return null;
+  return (
+    <nav className="ide-tab-bar" aria-label="Accesos rápidos">
+      {pestanas.map(p => (
+        <NavLink key={p.ruta} to={p.ruta} end={p.ruta === '/'} className={({ isActive }) => `ide-tab${isActive ? ' activa' : ''}`}>{p.etiqueta}</NavLink>
+      ))}
+    </nav>
+  );
+};
+
+const Header: React.FC<{ onMenuMovil: () => void }> = ({ onMenuMovil }) => {
+  const { pathname } = useLocation();
+  const { conectado } = useTiempoReal();
+  const { puede } = useAuth();
+  const item = itemDeRuta(pathname, puede);
+  return (
+    <header className="header">
+      <div className="header-fila">
+        <button className="btn btn-ghost btn-icono header-menu-movil" onClick={onMenuMovil} aria-label="Abrir menú"><Menu size={20} /></button>
+        <div className="header-titulo" title={item?.descripcion}>
+          <span className="header-sistema">Sistema ANPR</span>
+          <h1>{item?.titulo ?? 'Inicio'}</h1>
+        </div>
+        <div className="header-acciones">
+          <div className="header-estado ocultar-movil">
+            <span className={`pastilla-red ${conectado ? 'en-linea' : 'sin-conexion'}`}
+              title={conectado ? 'Recibiendo eventos en tiempo real' : 'Sin conexión de tiempo real: reintentando'}>
+              {conectado ? <Wifi size={13} /> : <WifiOff size={13} />} {conectado ? 'En línea' : 'Reconectando…'}
+            </span>
+            <RelojSesion />
+          </div>
+          <div className="header-herramientas" role="group" aria-label="Herramientas del sistema">
+            <BotonTema />
+            <BotonSonido />
+            <CampanaNotificaciones />
+          </div>
+          <MenuUsuario />
+        </div>
+      </div>
+      <BarraPestanas />
+    </header>
+  );
+};
+
+/**
+ * Una pestaña abierta antes de actualizar el sistema (p. ej. la del guardia, que pasa el turno
+ * entero en Registro de Ingresos) sigue con el código anterior en memoria: se ofrece recargarla.
+ */
+const AvisoVersionNueva: React.FC = () => {
+  const nueva = useVersionNueva();
+  if (!nueva) return null;
+  return (
+    <div className="aviso-version" role="status">
+      <RefreshCw size={15} /> <span>Se instaló una versión nueva del sistema. Actualice para ver los cambios.</span>
+      <button type="button" className="btn btn-sm btn-navy" onClick={() => window.location.reload()}>Actualizar ahora</button>
+    </div>
+  );
+};
+
+export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [colapsado, setColapsado] = useState(() => {
+    try { return localStorage.getItem(CLAVE_COLAPSO) === '1'; } catch { return false; }
+  });
+  const [movil, setMovil] = useState(false);
+  const { pathname } = useLocation();
+  useEffect(() => { setMovil(false); }, [pathname]);
+  const alternar = () => setColapsado(c => {
+    try { localStorage.setItem(CLAVE_COLAPSO, c ? '0' : '1'); } catch { /* sin almacenamiento */ }
+    return !c;
+  });
+  return (
+    <div className="app">
+      <Sidebar colapsado={colapsado} onColapsar={alternar} abiertoMovil={movil} onCerrarMovil={() => setMovil(false)} />
+      {movil && <div className="velo-movil" onClick={() => setMovil(false)} />}
+      <div className="contenido">
+        <Header onMenuMovil={() => setMovil(true)} />
+        <main>
+          <Suspense fallback={<Cargando texto="Cargando módulo…" alto={320} />}>{children}</Suspense>
+        </main>
+        <AvisosAcceso />
+        <AvisoVersionNueva />
+      </div>
+    </div>
+  );
+};
