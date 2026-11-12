@@ -104,6 +104,11 @@ class HistorialCuadros:
             return None
         return cercano.jpeg
 
+    def ultima(self) -> Optional[tuple[float, bytes]]:
+        """(hora, JPEG completo) del cuadro más reciente, o None si no hay ninguno."""
+        with self._candado:
+            return (self._cuadros[-1].hora, self._cuadros[-1].jpeg) if self._cuadros else None
+
     def reiniciar(self) -> None:
         """Olvida lo guardado (al cambiar de cámara: los cuadros serían de otra)."""
         with self._candado:

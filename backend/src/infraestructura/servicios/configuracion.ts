@@ -102,6 +102,12 @@ export const DEFINICIONES: Definicion[] = [
     omision: 'true',
   },
   {
+    clave: 'evidencia_manual_segundos', tipo: 'entero', grupo: 'Operación',
+    etiqueta: 'Fotos automáticas del registro manual (segundos)',
+    descripcion: 'Al registrar un paso a mano sin elegir una foto, la cámara guarda sola la placa más legible que vio en estos últimos segundos y la foto del vehículo en ese momento; si no vio ninguna placa, guarda el cuadro más reciente. Sin cámara elegida se usa la cámara de ingreso, si hay una sola. 0 desactiva las fotos automáticas.',
+    omision: '15', min: 0, max: 30,
+  },
+  {
     clave: 'aviso_vencimiento_dias', tipo: 'entero', grupo: 'Operación',
     etiqueta: 'Aviso de autorizaciones por vencer (días)',
     descripcion: 'Las autorizaciones que vencen dentro de este plazo se destacan en el panel.',
@@ -252,6 +258,12 @@ export function salidaAutomatica(): { activa: boolean; minimoSegundos: number } 
 
 export function salidaManualPermitida(): boolean {
   return config.booleano('salida_manual_habilitada');
+}
+
+/** Ventana de las fotos automáticas del registro manual, en segundos (0 = desactivadas). */
+export function segundosEvidenciaManual(): number {
+  const s = config.entero('evidencia_manual_segundos');
+  return Number.isFinite(s) ? Math.max(0, Math.min(30, s)) : 15;
 }
 
 /** Política de autorización automática vigente (parámetros de la pantalla de configuración). */

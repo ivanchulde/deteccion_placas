@@ -208,7 +208,7 @@ const Monitoreo: React.FC = () => {
             ? 'Este registro ya está completo y puede consultarse en Registro de Salidas.'
             : 'La tabla muestra los accesos sin salida o pendientes de completar; la fila se resalta si está en la página visible.'}
         </AvisoFlotante>}
-        <div className="grid-principal" style={{ gridTemplateColumns: 'minmax(0, 1.9fr) minmax(320px, 1fr)' }}>
+        <div className="grid-principal grid-monitoreo">
           {/* ── Video y controles ── */}
           <div className="pila">
             {motor?.en_linea && analisis && !analisis.conectada && (

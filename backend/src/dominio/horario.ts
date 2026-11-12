@@ -117,6 +117,26 @@ export function evaluarVigencia(permiso: PermisoTemporal, ahora: Date, zona: str
   return 'vigente';
 }
 
+/**
+ * Lo que significa un permiso para la garita hoy (Lista de Permisos): puede ingresar ahora, hoy pero
+ * en otra franja, hoy no le corresponde, aún no empieza, venció o fue retirado.
+ */
+export type EstadoPermisoHoy = 'habilitado_ahora' | 'habilitado_hoy' | 'no_habilitado_hoy' | 'no_iniciado' | 'vencido' | 'retirado';
+
+export function estadoPermisoHoy(permiso: PermisoTemporal & { activo?: boolean | null }, ahora: Date, zona: string): EstadoPermisoHoy {
+  if (permiso.activo === false) return 'retirado';
+  const vigencia = evaluarVigencia(permiso, ahora, zona);
+  if (vigencia === 'no_iniciada') return 'no_iniciado';
+  if (vigencia === 'vencida') return 'vencido';
+  if (vigencia === 'vigente') return 'habilitado_ahora';
+  // Fuera de horario en este momento: ¿alguna franja cae hoy (o empezó ayer y cruza la medianoche)?
+  const { dia } = tiempoLocal(ahora, zona);
+  const ayer = dia === 1 ? 7 : dia - 1;
+  const hoy = (leerHorario(permiso.horario) ?? []).some(f =>
+    f.dias.includes(dia) || (minutos(f.hasta) <= minutos(f.desde) && f.dias.includes(ayer)));
+  return hoy ? 'habilitado_hoy' : 'no_habilitado_hoy';
+}
+
 /** Rango compacto de días: [1,2,3,4,5] → "L–V", [1,3,5] → "L, X, V". */
 function describirDias(dias: number[]): string {
   if (dias.length === 7) return 'Todos los días';

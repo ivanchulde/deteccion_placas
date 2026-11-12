@@ -7,6 +7,7 @@ import {
 import { validarEntero, validarTexto, validarPlaca } from '../dominio/validacion';
 import { type Rol, tienePermiso } from '../dominio/permisos';
 import { leerFilasImportacion } from '../dominio/importacionPermisos';
+import { estadoPermisoHoy } from '../dominio/horario';
 import { LISTA_BLANCA, LISTA_NEGRA } from '../dominio/listas';
 
 /**
@@ -38,6 +39,11 @@ export interface RepositorioListas {
   registroPermisos(f: { usuarioId: number | null; estado: EstadoRegistroPermisos }): Promise<RegistroListaDTO[]>;
   /** Gestores de permisos y cualquier usuario que haya registrado alguno */
   usuariosPadron(): Promise<{ id: number; nombre: string; email: string; rol: string; estado: string }[]>;
+  /**
+   * Permisos otorgados por usuarios con rol de gestor de permisos (Lista de Permisos de la garita),
+   * con el rol y cargo de quien lo otorgó, los ingresos desde `inicioHoy` y el último ingreso.
+   */
+  permisosDeGestores?(f: { estado: EstadoRegistroPermisos; inicioHoy: Date }): Promise<RegistroListaDTO[]>;
   /** Vuelve a activar un registro retirado tal como estaba; false si no estaba retirado */
   restaurar(def: DefinicionLista, id: number): Promise<boolean>;
   /**
@@ -83,6 +89,8 @@ export interface DependenciasListas {
   leerHoja?: (contenido: Buffer) => Promise<string[][]>;
   /** Borra las fotos conservadas de un registro eliminado definitivamente */
   evidencia?: { eliminar(rutas: (string | null)[]): Promise<number> };
+  /** Reloj de la institución (estado de hoy de cada permiso en la Lista de Permisos) */
+  tiempo?: { ahora(): Date; zona: string; inicioDiaLocal(fecha: Date): Date };
 }
 
 /** Resultado de cada fila de una importación (o de su vista previa). */
@@ -374,6 +382,26 @@ export function casosListas(d: DependenciasListas) {
         d.repositorio.usuariosPadron(),
       ]);
       return { items, usuarios: resumirPorUsuario(usuarios, todos) };
+    },
+
+    /**
+     * Lista de Permisos de la garita (listas:ver, solo lectura): cada permiso que otorgó un gestor de
+     * permisos, por separado, con quién lo otorgó y cuándo, a quién y por qué, y lo que significa hoy
+     * (puede ingresar ahora, hoy en otro horario, hoy no, aún no inicia, vencido o retirado). Los
+     * permisos ya están en la lista blanca: esta vista no concede ni modifica nada.
+     */
+    async listaPermisos(consulta: Record<string, unknown>) {
+      if (!d.repositorio.permisosDeGestores || !d.tiempo) return { generado: null, items: [] };
+      const ahora = d.tiempo.ahora();
+      const estado = leerEstado(consulta.estado, 'activos');
+      const filas = await d.repositorio.permisosDeGestores({ estado, inicioHoy: d.tiempo.inicioDiaLocal(ahora) });
+      return {
+        generado: ahora.toISOString(),
+        items: filas.map(f => ({
+          ...f,
+          estado_hoy: estadoPermisoHoy({ activo: f.activo, fecha_inicio: f.fecha_inicio, fecha_vencimiento: f.fecha_vencimiento, horario: f.horario }, ahora, d.tiempo!.zona),
+        })),
+      };
     },
 
     /**

@@ -210,6 +210,28 @@ def crear_app(gestor: GestorCamaras) -> FastAPI:
             return JSONResponse({"error": "El cuadro ya no está en el historial de los últimos 30 s."}, status_code=404)
         return {"ruta": ruta}
 
+    @app.post("/api/evidencia/reciente")
+    async def evidencia_reciente(request: Request):
+        """{"camara_id": id, "segundos": n} → fotos automáticas del registro manual: la placa más legible
+        vista en esos segundos y el cuadro del vehículo ({"ruta_vehiculo", "ruta_placa", …})."""
+        if not token_servicio_valido(request.headers.get("X-Servicio-Token")):
+            return _denegado()
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        payload = payload if isinstance(payload, dict) else {}
+        segundos = payload.get("segundos", 15)
+        if isinstance(segundos, bool) or not isinstance(segundos, (int, float)) or not 1 <= segundos <= 30:
+            return JSONResponse({"error": "Indique entre 1 y 30 segundos."}, status_code=400)
+        motor = gestor.motor(payload.get("camara_id"))
+        if motor is None:
+            return _sin_camara()
+        evidencia = motor.evidencia_reciente(float(segundos))
+        if evidencia is None:
+            return JSONResponse({"error": "La cámara no entregó cuadros en ese lapso."}, status_code=404)
+        return evidencia
+
     def _interno(request: Request) -> bool:
         return acceso_interno(request.client.host if request.client else None, request.headers.get("X-Servicio-Token"))
 

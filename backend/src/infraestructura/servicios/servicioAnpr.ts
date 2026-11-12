@@ -146,6 +146,28 @@ export async function guardarCuadroAnpr(camaraId: number, t: number): Promise<st
   }
 }
 
+/**
+ * Fotos automáticas del registro manual: la placa más legible que vio la cámara en los últimos
+ * `segundos` y el vehículo en ese momento. null si ningún motor analiza la cámara o no respondió.
+ */
+export async function evidenciaRecienteAnpr(camaraId: number, segundos: number): Promise<{
+  rutaVehiculo: string | null; rutaPlaca: string | null; placaLeida: string | null; haceS: number | null;
+} | null> {
+  try {
+    const indice = await indiceDeCamara(camaraId);
+    if (indice === null) return null;
+    const r = await llamar(indice, '/api/evidencia/reciente', { method: 'POST', body: JSON.stringify({ camara_id: camaraId, segundos }) }, 8000);
+    return {
+      rutaVehiculo: typeof r.ruta_vehiculo === 'string' ? r.ruta_vehiculo : null,
+      rutaPlaca: typeof r.ruta_placa === 'string' ? r.ruta_placa : null,
+      placaLeida: typeof r.placa_leida === 'string' ? r.placa_leida : null,
+      haceS: typeof r.hace_s === 'number' ? r.hace_s : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** URL vista desde el navegador del motor que atiende la cámara (para sus WebSocket de video y pistas). */
 export function urlPublicaAnpr(camaraId?: number): string {
   const urls = urlsPublicas();

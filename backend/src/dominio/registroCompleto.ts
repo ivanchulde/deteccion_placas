@@ -12,7 +12,7 @@ export function datosRegistro(d: Record<string, any>) {
   return {
     nombre: datoRegistro(d.persona_ingreso, d.propietario),
     placa: datoRegistro(d.placa_validada, d.placa_reconocida),
-    tipo: datoRegistro(d.tipo_vehiculo, d.autorizado_tipo, d.vehiculo_tipo),
+    tipo: datoRegistro(d.vehiculo_tipo, d.tipo_vehiculo, d.autorizado_tipo),
     marca: datoRegistro(d.vehiculo_marca, d.autorizado_marca),
     // El motivo del paso o, si está vacío, el del permiso de la lista blanca
     motivo: datoRegistro(d.motivo_ingreso, d.autorizado_motivo),

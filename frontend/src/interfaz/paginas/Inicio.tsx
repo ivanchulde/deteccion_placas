@@ -93,23 +93,36 @@ const RelojGuardia: React.FC = () => {
   </div>;
 };
 
-/** Resume por separado los movimientos del día y los vehículos que siguen dentro. */
-const BalanceGuardia: React.FC<{ entradas: number; salidas: number }> = ({ entradas, salidas }) => {
+/**
+ * Balance del día en tres celdas de la cuadrícula del guardia: entradas, salidas (anillo con su
+ * parte de los movimientos) y el total.
+ */
+const BalanceGuardia: React.FC<{ entradas: number; salidas: number; cargando?: boolean }> = ({ entradas, salidas, cargando }) => {
   const total = entradas + salidas;
-  return <div className="guardia-balance">{[
+  const valor = (n: number) => (cargando ? '…' : numero(n));
+  return <>{[
     { titulo: 'Entradas de hoy', valor: entradas, color: '#16a66a', clase: 'entrada' },
     { titulo: 'Salidas de hoy', valor: salidas, color: '#e35454', clase: 'salida' },
   ].map(x => {
     const porcentaje = total ? Math.round(x.valor / total * 100) : 0;
-    return <section key={x.clase} className={`guardia-balance-item ${x.clase}`}>
+    return <section key={x.clase} className={`guardia-celda guardia-balance-item ${x.clase}`}>
       <h3>{x.titulo}</h3>
       <div className="guardia-anillo" role="img" aria-label={`${x.titulo}: ${x.valor}, ${porcentaje} % de los movimientos de hoy`}
         style={{ background: `conic-gradient(${x.color} ${porcentaje}%, var(--surface-3) 0)` }}>
-        <div><strong>{numero(x.valor)}</strong><span>{porcentaje} % de movimientos</span></div>
+        <div><strong>{valor(x.valor)}</strong><span>{porcentaje} % de movimientos</span></div>
       </div>
       <span className="texto-secundario">{x.clase === 'entrada' ? 'Ingresos registrados hoy' : 'Salidas registradas hoy'}</span>
     </section>;
-  })}<div className="guardia-balance-total">Movimientos registrados hoy: <strong>{numero(total)}</strong> (entradas: {numero(entradas)} · salidas: {numero(salidas)})</div></div>;
+  })}
+  <section className="guardia-celda guardia-total">
+    <h3>Movimientos de hoy</h3>
+    <strong className="guardia-total-numero">{valor(total)}</strong>
+    <div className="guardia-total-detalle">
+      <span><i className="entrada" aria-hidden /> Entradas <b>{valor(entradas)}</b></span>
+      <span><i className="salida" aria-hidden /> Salidas <b>{valor(salidas)}</b></span>
+    </div>
+    <p className="guardia-balance-total">Movimientos registrados hoy: <strong>{numero(total)}</strong> (entradas: {numero(entradas)} · salidas: {numero(salidas)})</p>
+  </section></>;
 };
 
 /** Panel del guardia: control del turno, balance y accesos directos. */
@@ -180,8 +193,9 @@ const PanelOperador: React.FC = () => {
         </div>
       </div>
       {error && <AvisoFlotante tipo="error" style={{ marginBottom: 16 }}>{error}</AvisoFlotante>}
-      <div className="pila">
-        <section className="guardia-control">
+      {/* Cuadrícula que ocupa el alto visible en escritorio (sin scroll); en tableta y celular, en columna */}
+      <div className="guardia-grid">
+        <section className="guardia-celda guardia-control" aria-label="Registro de entrada o salida">
           <RelojGuardia />
           <div className="guardia-acciones">
             <div className="guardia-identificador">
@@ -201,15 +215,17 @@ const PanelOperador: React.FC = () => {
           <p className="guardia-indicacion">{salidaManual
             ? 'El sistema identifica si corresponde una entrada o una salida, ya sea por placa o por cédula.'
             : 'La salida manual está desactivada; la cámara registra la salida por placa.'}</p>
-          <div className="guardia-dentro"><span>Vehículos dentro</span><strong>{cargando && !r ? '…' : numero(r?.movimientos?.dentro)}</strong>
-            <small>Ingresos autorizados que todavía no registran salida.</small></div>
+        </section>
+        <section className="guardia-celda guardia-dentro" aria-label="Vehículos dentro">
+          <span>Vehículos dentro</span><strong>{cargando && !r ? '…' : numero(r?.movimientos?.dentro)}</strong>
+          <small>Ingresos autorizados que todavía no registran salida.</small>
           <div className="fila guardia-enlaces">
             <Link to="/detecciones" className="btn btn-secondary btn-sm"><LogOut size={14} /> Registro de Salidas: {cargando && !r ? '…' : numero(r?.movimientos?.registros_completos)}</Link>
             <Link to="/historial" className="btn btn-secondary btn-sm"><History size={14} /> Historial completo</Link>
           </div>
           <small className="texto-secundario guardia-historico">Accesos en el historial: {cargando && !r ? '…' : numero(r?.movimientos?.registros_acceso)}</small>
         </section>
-        {r?.movimientos && <BalanceGuardia entradas={r.movimientos.entradas} salidas={r.movimientos.salidas} />}
+        <BalanceGuardia entradas={r?.movimientos?.entradas ?? 0} salidas={r?.movimientos?.salidas ?? 0} cargando={cargando && !r} />
       </div>
       {confirmacion && <div className="guardia-confirmacion" role="alert" aria-live="assertive">
         <div className={`guardia-confirmacion-tarjeta ${confirmacion.tipo}`}>

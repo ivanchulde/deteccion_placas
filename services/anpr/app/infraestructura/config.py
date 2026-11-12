@@ -98,10 +98,11 @@ OCR_VERIFIER_THREADS: int = int(os.getenv("OCR_VERIFIER_THREADS", "4"))
 PLATE_RECTIFIER_PATH: str = os.getenv("PLATE_RECTIFIER_PATH", "models/plate_rectifier.pt")
 PLATE_RECTIFIER_MIN_KPT_CONF: float = float(os.getenv("PLATE_RECTIFIER_MIN_KPT_CONF", "0.5"))
 
-# Atributos del vehículo (tipo, color, marca, modelo) como segundo factor para las listas.
-# YOLO26n COCO ubica el vehículo y CLIP (zero-shot) clasifica contra el catálogo ecuatoriano.
+# Clasificación ligera de tipo (auto, moto, bus o camión) mediante las clases COCO de YOLO.
+VEHICLE_TYPE_ENABLED: bool = os.getenv("VEHICLE_TYPE_ENABLED", "true").lower() in ("true", "1", "yes")
 VEHICLE_ATTR_ENABLED: bool = os.getenv("VEHICLE_ATTR_ENABLED", "true").lower() in ("true", "1", "yes")
 VEHICLE_DETECTOR_PATH: str = os.getenv("VEHICLE_DETECTOR_PATH", "yolo26n.pt")
+# Atributos adicionales (color, marca y modelo) con CLIP zero-shot.
 VEHICLE_CLIP_MODEL: str = os.getenv("VEHICLE_CLIP_MODEL", "ViT-B-32")
 VEHICLE_CLIP_PRETRAINED: str = os.getenv("VEHICLE_CLIP_PRETRAINED", "laion2b_s34b_b79k")
 # Probabilidad mínima para aceptar un atributo; por debajo se reporta como desconocido

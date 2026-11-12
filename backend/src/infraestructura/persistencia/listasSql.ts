@@ -154,6 +154,28 @@ export const repositorioListasSql: RepositorioListas = {
     return r.recordset.map(x => ({ ...mapear(LISTA_BLANCA, x), activo: Boolean(x.activo) }));
   },
 
+  async permisosDeGestores(f) {
+    const request = db().request().input('inicioHoy', sql.DateTime, f.inicioHoy);
+    const estado = f.estado === 'activos' ? ' AND t.activo = 1' : f.estado === 'retirados' ? ' AND t.activo = 0' : '';
+    const r = await request.query(`
+      SELECT p.*, ro.codigo AS registrado_por_rol, ro.nombre AS registrado_por_rol_nombre, ug.cargo AS registrado_por_cargo,
+             (SELECT COUNT(*) FROM DeteccionVehiculo d
+               WHERE d.vehiculo_autorizado_id = p.id AND COALESCE(d.tipo_movimiento, 'ingreso') = 'ingreso'
+                 AND d.fecha_hora_ingreso >= @inicioHoy) AS ingresos_hoy,
+             (SELECT MAX(d.fecha_hora_ingreso) FROM DeteccionVehiculo d
+               WHERE d.vehiculo_autorizado_id = p.id AND COALESCE(d.tipo_movimiento, 'ingreso') = 'ingreso') AS ultimo_ingreso
+      FROM (${selectLista(LISTA_BLANCA)} WHERE t.registrado_por IS NOT NULL${estado}) p
+      JOIN Usuarios ug ON ug.id = p.registrado_por
+      JOIN Roles ro ON ro.id = ug.rol_id
+      WHERE ro.codigo = 'GESTOR_PERMISOS'
+      ORDER BY p.activo DESC, p.fecha_registro DESC`);
+    return r.recordset.map(x => ({
+      ...mapear(LISTA_BLANCA, x), activo: Boolean(x.activo),
+      ingresos_hoy: Number(x.ingresos_hoy) || 0,
+      ultimo_ingreso: x.ultimo_ingreso ? new Date(x.ultimo_ingreso).toISOString() : null,
+    }));
+  },
+
   async usuariosPadron() {
     // Quien puede otorgar permisos hoy (gestores) y cualquiera que haya registrado alguno
     const r = await db().request().query(`

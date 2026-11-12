@@ -61,6 +61,11 @@ function crearRouter(def: DefinicionLista): Router {
       if (id !== null) res.json({ item: await listas.completarPlaca(def, id, req.body?.placa, actorDe(req)) });
     }));
 
+  // Lista de Permisos de la garita: cada permiso otorgado por un gestor, con quién lo dio y su estado de hoy
+  if (def.tipo === 'autorizados') router.get('/lista-permisos', ...lectura, controlador(contexto, 'No se pudo consultar la lista de permisos.', async (req, res) => {
+    res.json(await listas.listaPermisos(req.query));
+  }));
+
   if (def.tipo === 'autorizados') router.get('/mis-permisos', ...lectura, controlador(contexto, 'No se pudieron consultar sus permisos.', async (req, res) => {
     res.json(await listas.misPermisos(req.query, actorDe(req)));
   }));

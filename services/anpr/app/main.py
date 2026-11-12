@@ -48,13 +48,14 @@ from app.infraestructura.config import (
     SIN_PLACA_FRACCION_VEHICULO,
     SIN_PLACA_HABILITADO,
     RESCATE_CUADROS,
+    VEHICLE_TYPE_ENABLED,
 )
 from app.infraestructura.debug_stream import DebugFrameBuffer, cuadro_espera, try_imshow
 from app.infraestructura.detectors import PoolDetector
 from app.infraestructura.logger import get_logger
 from app.infraestructura.ocr_engine import create_ocr_engine
 from app.infraestructura.ocr_verifier import get_verifier
-from app.infraestructura.vehicle_attributes import get_vehicle_recognizer
+from app.infraestructura.vehicle_attributes import get_vehicle_type_recognizer
 from app.infraestructura.vehiculos_coco import get_detector_vehiculos
 from app.infraestructura.video_source import RTSPSource
 from app.interfaz.api import crear_app
@@ -102,6 +103,7 @@ def crear_motor(camara_id: int, nombre: str, url: str) -> MotorAnpr:
             espera_verificador_s=OCR_VERIFIER_MAX_MS / 1000.0,
             presupuesto_registro_s=REGISTRO_MAX_MS / 1000.0 if REGISTRO_MAX_MS > 0 else None,
             confianza_minima_registro=PLATE_REGISTRATION_MIN_CONFIDENCE,
+            analizar_vehiculo=VEHICLE_TYPE_ENABLED,
             sin_placa_activo=SIN_PLACA_HABILITADO,
             rescate_cuadros=RESCATE_CUADROS,
             sin_placa=ParametrosSinPlaca(fraccion_vehiculo=SIN_PLACA_FRACCION_VEHICULO),
@@ -114,7 +116,7 @@ def crear_motor(camara_id: int, nombre: str, url: str) -> MotorAnpr:
             crear_motor_ocr=ocr_compartido,
             crear_trabajador_ocr=lambda motor_ocr, al_leer: AsyncOcrWorker(motor_ocr, on_ocr_completed=al_leer),
             verificador=get_verifier,
-            reconocedor_vehiculo=get_vehicle_recognizer,
+            reconocedor_vehiculo=get_vehicle_type_recognizer,
             fuente_rtsp=fuente_rtsp,
             cuadro_espera=cuadro_espera,
             mostrar_ventana=try_imshow,

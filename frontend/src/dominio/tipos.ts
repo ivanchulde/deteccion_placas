@@ -319,6 +319,18 @@ export interface RegistroLista {
   nivel_alerta?: 'CRITICA' | 'ALTA' | 'MEDIA';
 }
 
+/** Lo que significa un permiso para la garita hoy (lo calcula la API con vigencia y horario). */
+export type EstadoPermisoHoy = 'habilitado_ahora' | 'habilitado_hoy' | 'no_habilitado_hoy' | 'no_iniciado' | 'vencido' | 'retirado';
+
+/** Permiso otorgado por un gestor de permisos (Lista de Permisos de la garita). */
+export interface PermisoOtorgado extends RegistroLista {
+  registrado_por_rol_nombre?: string | null;
+  registrado_por_cargo?: string | null;
+  ingresos_hoy: number;
+  ultimo_ingreso: string | null;
+  estado_hoy: EstadoPermisoHoy;
+}
+
 export interface UsuarioAdmin {
   id: number;
   email: string;

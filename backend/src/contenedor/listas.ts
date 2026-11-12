@@ -5,6 +5,7 @@ import { repositorioListasSql } from '../infraestructura/persistencia/listasSql'
 import { notificarPermisoOtorgado } from '../infraestructura/servicios/avisosAcceso';
 import { leerHojaCalculo } from '../infraestructura/servicios/hojaCalculo';
 import { eliminarEvidenciaListas } from '../infraestructura/servicios/evidenciaListas';
+import { inicioDiaLocal, ZONA_HORARIA } from '../infraestructura/servicios/tiempo';
 
 /**
  * Raíz de composición (un archivo por módulo en src/contenedor/): el único lugar donde los
@@ -18,6 +19,7 @@ export const listas = casosListas({
   describirHorario,
   leerHoja: leerHojaCalculo,
   evidencia: { eliminar: eliminarEvidenciaListas },
+  tiempo: { ahora: () => new Date(), zona: ZONA_HORARIA, inicioDiaLocal: fecha => inicioDiaLocal(fecha) },
   avisos: {
     registroAgregado(def, registro, actor) {
       // Vehículo agregado a la lista blanca: la garita recibe la notificación

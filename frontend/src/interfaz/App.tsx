@@ -19,6 +19,7 @@ const Monitoreo = lazy(() => import('./paginas/Monitoreo'));
 const Detecciones = lazy(() => import('./paginas/Detecciones'));
 const HistorialCompleto = lazy(() => import('./paginas/HistorialCompleto'));
 const Listas = lazy(() => import('./paginas/Listas'));
+const ListaPermisos = lazy(() => import('./paginas/ListaPermisos'));
 const Reportes = lazy(() => import('./paginas/Reportes'));
 const Usuarios = lazy(() => import('./paginas/Usuarios'));
 const Auditoria = lazy(() => import('./paginas/Auditoria'));
@@ -76,6 +77,7 @@ const App: React.FC = () => (
               <Route path="/historial" element={<Privada permiso="operacion:monitorear"><HistorialCompleto /></Privada>} />
               <Route path="/detecciones/:id" element={<Privada permiso="operacion:monitorear"><RedirigirDetalleAnterior /></Privada>} />
               <Route path="/listas/:tipo" element={<Privada permiso="listas:ver"><Listas /></Privada>} />
+              <Route path="/permisos" element={<Privada permiso="listas:ver"><ListaPermisos /></Privada>} />
               <Route path="/solicitudes" element={<Privada permiso="padron:supervisar"><SolicitudesAcceso /></Privada>} />
               <Route path="/notificaciones" element={<Privada><Notificaciones /></Privada>} />
               <Route path="/perfil" element={<Privada><Perfil /></Privada>} />

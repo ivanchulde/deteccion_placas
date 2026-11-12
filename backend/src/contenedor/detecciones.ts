@@ -4,9 +4,9 @@ import { auditoriaSql, eventosSocket } from '../infraestructura/adaptadores';
 import { repositorioDeteccionesSql } from '../infraestructura/persistencia/deteccionesSql';
 import { presentarDeteccion } from '../infraestructura/presentacionDetecciones';
 import { notificarDecision, type PasoNotificable } from '../infraestructura/servicios/avisosAcceso';
-import { politicaAutorizacion, salidaAutomatica, salidaManualPermitida } from '../infraestructura/servicios/configuracion';
+import { politicaAutorizacion, salidaAutomatica, salidaManualPermitida, segundosEvidenciaManual } from '../infraestructura/servicios/configuracion';
 import { eliminarEvidencia } from '../infraestructura/servicios/media';
-import { guardarCuadroAnpr, historialAnpr } from '../infraestructura/servicios/servicioAnpr';
+import { evidenciaRecienteAnpr, guardarCuadroAnpr, historialAnpr } from '../infraestructura/servicios/servicioAnpr';
 import { resolverPorDeteccion } from '../infraestructura/servicios/notificaciones';
 import { findBlacklistMatch, findPermisoExacto } from '../infraestructura/servicios/plateMatching';
 import { ZONA_HORARIA } from '../infraestructura/servicios/tiempo';
@@ -38,6 +38,7 @@ export const detecciones = casosDetecciones({
   politica: politicaAutorizacion,
   salidaAutomatica,
   salidaManual: salidaManualPermitida,
+  segundosEvidenciaManual,
   compararVehiculo: (registrado, observado) => compararVehiculo(registrado, observado),
   avisos: {
     // notificar captura y registra los errores sin interrumpir el registro del paso
@@ -66,6 +67,7 @@ export const detecciones = casosDetecciones({
       }
     },
     guardar: guardarCuadroAnpr,
+    automatica: evidenciaRecienteAnpr,
   },
   eventos: eventosSocket,
   auditoria: auditoriaSql,

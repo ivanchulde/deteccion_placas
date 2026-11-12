@@ -73,7 +73,7 @@ const Perfil: React.FC = () => {
 
   return (
     <div className="pagina" style={{ maxWidth: 1100 }}>
-      <div className="grid-principal" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.4fr)' }}>
+      <div className="grid-principal grid-perfil">
         <div className="pila">
           <Tarjeta>
             <div className="pila" style={{ alignItems: 'center', textAlign: 'center', gap: 10 }}>

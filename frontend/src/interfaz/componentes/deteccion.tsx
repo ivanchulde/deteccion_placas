@@ -470,7 +470,7 @@ export const FotosRecientes: React.FC<{ camaraId: number; elegida: number | null
               })}
             </div>
           )}
-      <span className="ayuda">Opcional. Toque la foto en que se ve el vehículo: queda como evidencia del registro.</span>
+      <span className="ayuda">Opcional. Toque la foto en que se ve el vehículo: queda como evidencia del registro. Si no elige ninguna, la cámara guarda sola la placa más legible de los últimos segundos y la foto del vehículo.</span>
     </div>
   );
 };
@@ -577,6 +577,7 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
                 <option value="">Sin cámara asociada</option>
                 {camaras.map(c => <option key={c.id} value={c.id}>{c.nombre} · {c.direccion === 'salida' ? 'Salida' : 'Ingreso'} · {c.ubicacion}</option>)}
               </select>
+              {!camara && <span className="ayuda">Sin cámara elegida, las fotos de la placa y del vehículo se toman solas de la cámara de ingreso, si hay una sola.</span>}
             </div>
             {camara && <FotosRecientes camaraId={Number(camara)} elegida={foto} onElegir={setFoto} />}
             <div className="completo pila" style={{ gap: 6 }}>

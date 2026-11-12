@@ -22,6 +22,7 @@ import auditoriaRoutes from './interfaz/http/rutas/auditoria';
 import mediosRoutes from './interfaz/http/rutas/medios';
 import propietarioRoutes from './interfaz/http/rutas/propietario';
 import notificacionesRoutes from './interfaz/http/rutas/notificaciones';
+import mensajesRoutes from './interfaz/http/rutas/mensajes';
 import solicitudesAccesoRoutes from './interfaz/http/rutas/solicitudesAcceso';
 import { generarOpenApi } from './interfaz/http/docs/openapi';
 
@@ -44,6 +45,7 @@ export const MONTAJES: [string, express.Router][] = [
   ['/api/medios', mediosRoutes],
   ['/api/propietario', propietarioRoutes],
   ['/api/notificaciones', notificacionesRoutes],
+  ['/api/mensajes', mensajesRoutes],
   ['/api/solicitudes-acceso', solicitudesAccesoRoutes],
 ];
 

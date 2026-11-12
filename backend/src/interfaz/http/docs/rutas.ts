@@ -749,6 +749,15 @@ export const RUTAS: RutaDoc[] = [
     respuestas: { 400: 'Estado inválido' },
   },
   {
+    metodo: 'get', ruta: '/api/vehiculos-autorizados/lista-permisos', etiqueta: 'Lista blanca', acceso: 'listas:ver',
+    resumen: 'Lista de Permisos de la garita',
+    descripcion: 'Cada permiso otorgado por un gestor de permisos (ya incluido en la lista blanca), con quién lo otorgó, '
+      + 'su rol y cargo, la persona, el motivo y la vigencia; `estado_hoy` dice si puede ingresar ahora, hoy en otro horario, '
+      + 'hoy no, aún no inicia, venció o fue retirado; `ingresos_hoy` y `ultimo_ingreso` cuentan sus ingresos. Solo lectura.',
+    consulta: { estado: { tipo: 'string', descripcion: 'Por omisión `activos`', valores: ['activos', 'retirados', 'todos'] } },
+    respuestas: { 400: 'Estado inválido' },
+  },
+  {
     metodo: 'post', ruta: '/api/vehiculos-autorizados/:id(\\d+)/placa', etiqueta: 'Lista blanca', acceso: 'detecciones:validar',
     resumen: 'Completa la placa de un permiso otorgado por nombre',
     descripcion: 'El guardia asigna la placa después de verificar a la persona (identidad_confirmada: true). Queda en la auditoría.',
@@ -950,6 +959,43 @@ export const RUTAS: RutaDoc[] = [
   {
     metodo: 'get', ruta: '/api/propietario/auditoria', etiqueta: 'Propietario', acceso: 'propietario:consultar',
     resumen: 'Últimas consultas de propietario registradas',
+  },
+
+  // ─── Mensajería interna ─────────────────────────────────────────────────────
+  {
+    metodo: 'get', ruta: '/api/mensajes/contactos', etiqueta: 'Mensajes', acceso: 'sesion',
+    resumen: 'Contactos de la mensajería interna',
+    descripcion: 'Usuarios activos agrupados en Guardianía, Servicios institucionales y Administración, con su último mensaje '
+      + 'y cuántos dejaron sin leer a quien consulta.',
+  },
+  {
+    metodo: 'get', ruta: '/api/mensajes/resumen', etiqueta: 'Mensajes', acceso: 'sesion',
+    resumen: 'Mensajes sin leer (ícono del encabezado)',
+  },
+  {
+    metodo: 'get', ruta: '/api/mensajes/:usuarioId(\\d+)', etiqueta: 'Mensajes', acceso: 'sesion',
+    resumen: 'Conversación con un usuario',
+    descripcion: 'Los 40 mensajes más recientes, del más antiguo al más reciente; con `antes_de` los anteriores. Solo las conversaciones propias.',
+    consulta: { antes_de: { tipo: 'integer', descripcion: 'Id del mensaje más antiguo ya cargado' } },
+    respuestas: { 400: 'Usuario inválido o el propio' },
+  },
+  {
+    metodo: 'post', ruta: '/api/mensajes/:usuarioId(\\d+)', etiqueta: 'Mensajes', acceso: 'sesion',
+    resumen: 'Envía un mensaje',
+    descripcion: 'Llega en tiempo real al destinatario (`mensaje:nuevo`). Conserva los saltos de línea.',
+    cuerpo: { texto: { tipo: 'string', descripcion: 'Entre 1 y 2000 caracteres', requerido: true } },
+    respuestas: { 400: 'Texto vacío o demasiado largo', 404: 'El usuario no existe o está deshabilitado' },
+  },
+  {
+    metodo: 'post', ruta: '/api/mensajes/:usuarioId(\\d+)/leidos', etiqueta: 'Mensajes', acceso: 'sesion',
+    resumen: 'Marca como leído lo que ese usuario le escribió',
+  },
+  {
+    metodo: 'delete', ruta: '/api/mensajes/:usuarioId(\\d+)', etiqueta: 'Mensajes', acceso: 'sesion',
+    resumen: 'Elimina la conversación con un usuario',
+    descripcion: 'Borra de la base todos los mensajes entre los dos participantes (no se puede deshacer). Queda en la auditoría '
+      + 'quién la eliminó, con quién y cuántos mensajes, sin el contenido; el otro participante recibe `mensajes:conversacion-eliminada`.',
+    respuestas: { 400: 'Usuario inválido o el propio' },
   },
 
   // ─── Notificaciones ─────────────────────────────────────────────────────────

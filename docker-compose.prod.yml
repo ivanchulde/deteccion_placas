@@ -182,6 +182,7 @@ services:
       # Sin fuentes propias: el backend le asigna las cámaras registradas (sus rutas en MediaMTX)
       - ANPR_MAX_CAMARAS=${ANPR_MAX_CAMARAS:-4}
       - ANPR_DETECTORES=${ANPR_DETECTORES:-1}
+      - VEHICLE_TYPE_ENABLED=${VEHICLE_TYPE_ENABLED:-true}
       # Hilos del decodificador de video: 1 = sin cuadros retenidos (ver video_source.py)
       - RTSP_HILOS_DECODIFICADOR=${RTSP_HILOS_DECODIFICADOR:-1}
       - RUNNING_IN_DOCKER=true

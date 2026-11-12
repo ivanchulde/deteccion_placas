@@ -241,20 +241,21 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
         WHERE id = @id AND tipo_movimiento = 'salida'`);
   },
 
-  async crearSalidaManual({ placa, camaraId, usuarioId, rutaImagen }) {
+  async crearSalidaManual({ placa, camaraId, usuarioId, rutaImagen, rutaImagenPlaca }) {
     const r = await db().request()
       .input('placa', sql.VarChar(20), placa)
       .input('camara', sql.Int, camaraId)
       .input('usuario', sql.Int, usuarioId)
       .input('ruta', sql.VarChar(255), rutaImagen ?? null)
+      .input('rutaPlaca', sql.VarChar(255), rutaImagenPlaca ?? null)
       .query(`INSERT INTO DeteccionVehiculo (
           placa_reconocida, placa_validada, camara_id, tipo_movimiento, fuente, fecha_hora_ingreso,
           fecha_hora_procesamiento, estado_procesamiento, estado_validacion, decision_automatica,
-          validado_manualmente, usuario_validador_id, fecha_validacion, ruta_imagen_ingreso
+          validado_manualmente, usuario_validador_id, fecha_validacion, ruta_imagen_ingreso, ruta_imagen_placa
         )
         OUTPUT INSERTED.id
         VALUES (@placa, @placa, @camara, 'salida', 'manual', GETDATE(), GETDATE(),
-                'procesado', 'salida_registrada', 'salida_registrada', TRUE, @usuario, GETDATE(), @ruta)`);
+                'procesado', 'salida_registrada', 'salida_registrada', TRUE, @usuario, GETDATE(), @ruta, @rutaPlaca)`);
     return r.recordset[0].id;
   },
 
@@ -744,15 +745,22 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
       .input('marca', sql.VarChar(50), x.marca)
       .input('usuario', sql.Int, x.usuarioId)
       .input('ruta', sql.VarChar(255), x.rutaImagen ?? null)
+      .input('rutaPlaca', sql.VarChar(255), x.rutaImagenPlaca ?? null)
       .query(`
         INSERT INTO DeteccionVehiculo (placa_reconocida, placa_validada, fuente, camara_id, estado_procesamiento, estado_validacion,
                                        alerta_id, vehiculo_autorizado_id, restriccion_acceso, tipo_vehiculo, validado_manualmente,
                                        usuario_validador_id, fecha_validacion, fecha_hora_ingreso, fecha_hora_procesamiento, decision_automatica,
-                                       ruta_imagen_ingreso, vehiculo_tipo, vehiculo_marca)
+                                       ruta_imagen_ingreso, ruta_imagen_placa, vehiculo_tipo, vehiculo_marca)
         OUTPUT INSERTED.id
         VALUES (NULL, @placa, 'manual', @camara, 'procesado', @estado, @alerta, @autorizado, @restriccion, @tipo, TRUE, @usuario,
-                GETDATE(), GETDATE(), GETDATE(), 'manual', @ruta, @tipo, @marca)`);
+                GETDATE(), GETDATE(), GETDATE(), 'manual', @ruta, @rutaPlaca, @tipo, @marca)`);
     return r.recordset[0].id;
+  },
+
+  async camaraIngresoUnica() {
+    const r = await db().request().query(`
+      SELECT id FROM Camaras WHERE activa = TRUE AND analisis_anpr = TRUE AND direccion = 'ingreso' ORDER BY id LIMIT 2`);
+    return r.recordset.length === 1 ? Number(r.recordset[0].id) : null;
   },
 
   async eliminar(id) {

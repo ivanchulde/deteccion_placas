@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  BarChart3, Bell, Camera, ClipboardList, FileCheck2, History, LayoutDashboard, LogOut, MonitorPlay, Server, Settings, ShieldAlert,
+  BarChart3, Bell, Camera, ClipboardCheck, ClipboardList, FileCheck2, History, LayoutDashboard, LogOut, MonitorPlay, Server, Settings, ShieldAlert,
   ShieldCheck, UserCircle, Users,
 } from 'lucide-react';
 import { esVistaGestionPermisos, type Permiso } from '../../dominio/permisos';
@@ -38,6 +38,7 @@ export const MENU: GrupoMenu[] = [
     items: [
       { ruta: '/listas/autorizados', titulo: 'Lista blanca', descripcion: 'Vehículos autorizados a ingresar, con vigencia y horario', icono: <ShieldCheck size={18} />, permiso: 'listas:ver' },
       { ruta: '/listas/alertas', titulo: 'Lista negra', descripcion: 'Placas con alerta de seguridad: su paso genera una alarma', icono: <ShieldAlert size={18} />, permiso: 'listas:ver' },
+      { ruta: '/permisos', titulo: 'Lista de Permisos', descripcion: 'Permisos otorgados por los gestores: quién ingresa hoy, por qué y quién lo autorizó', icono: <ClipboardCheck size={18} />, permiso: 'listas:ver' },
       { ruta: '/solicitudes', titulo: 'Gestión de Permisos', descripcion: 'Permisos otorgados por todos los usuarios', icono: <FileCheck2 size={18} />, permiso: 'padron:supervisar' },
       { ruta: '/detecciones', titulo: 'Registro de Salidas', descripcion: 'Registros completos con salida: hoja de control, validación y exportación', icono: <LogOut size={18} />, permiso: 'operacion:monitorear' },
       { ruta: '/historial', titulo: 'Historial Completo', descripcion: 'Todos los pasos registrados, con consulta inteligente por placa, fecha, hora y estado', icono: <History size={18} />, permiso: 'operacion:monitorear', contador: 'revision' },
@@ -94,6 +95,7 @@ const PESTANAS: Record<string, string> = {
   '/camaras': 'Cámaras',
   '/listas/autorizados': 'Lista blanca',
   '/listas/alertas': 'Lista negra',
+  '/permisos': 'Lista de Permisos',
   '/solicitudes': 'Gestión de Permisos',
   '/detecciones': 'Registro de Salidas',
   '/historial': 'Historial',

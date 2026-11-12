@@ -178,9 +178,11 @@ export interface RepositorioDetecciones {
   historialPlaca(placa: string, excluirId?: number): Promise<Fila[]>;
   auditoriaDe(id: number): Promise<Fila[]>;
   guardarValidacion(id: number, d: { placa: string | null; tipo: string | null; usuarioId: number }, cruce: Cruce, decision: Decision): Promise<void>;
-  crearManual(d: { placa: string | null; camaraId: number | null; tipo: string | null; marca: string | null; usuarioId: number; rutaImagen?: string },
+  crearManual(d: { placa: string | null; camaraId: number | null; tipo: string | null; marca: string | null; usuarioId: number; rutaImagen?: string; rutaImagenPlaca?: string },
     cruce: Cruce, decision: Decision): Promise<number>;
-  crearSalidaManual(d: { placa: string | null; camaraId: number; usuarioId: number; rutaImagen?: string }): Promise<number>;
+  crearSalidaManual(d: { placa: string | null; camaraId: number; usuarioId: number; rutaImagen?: string; rutaImagenPlaca?: string }): Promise<number>;
+  /** La única cámara de ingreso habilitada que analiza el motor (null si no hay o hay varias) */
+  camaraIngresoUnica?(): Promise<number | null>;
   /** Nombres y apellidos de quien ingresa y motivo de ingreso (solo los campos presentes) */
   guardarDatosIngreso(id: number, d: DatosIngreso): Promise<void>;
   /** Corrección histórica atómica: no concede accesos ni modifica permisos de las listas. */
@@ -205,6 +207,19 @@ export interface PuertoEvidenciaManual {
   cuadros(camaraId: number): Promise<{ disponible: boolean; motivo?: string; cuadros: CuadroHistorial[] }>;
   /** Guarda como foto de evidencia el cuadro de esa hora; su ruta /media/…, o null si ya no está */
   guardar(camaraId: number, t: number): Promise<string | null>;
+  /**
+   * Fotos automáticas: la placa más legible que la cámara vio en los últimos `segundos` (recorte) y
+   * el cuadro del vehículo en ese momento. null si el motor no analiza la cámara o no respondió.
+   */
+  automatica?(camaraId: number, segundos: number): Promise<EvidenciaAutomatica | null>;
+}
+
+export interface EvidenciaAutomatica {
+  rutaVehiculo: string | null;
+  rutaPlaca: string | null;
+  /** Placa que el motor leyó en esa pista, si la leyó */
+  placaLeida: string | null;
+  haceS: number | null;
 }
 
 /** Encabezado del reporte PDF de Registro de Salidas. */
@@ -232,6 +247,8 @@ export interface DependenciasDetecciones {
   /** Salida automática por la cámara de salida */
   salidaAutomatica: () => { activa: boolean; minimoSegundos: number };
   salidaManual: () => boolean;
+  /** Ventana de las fotos automáticas del registro manual (segundos; 0 = desactivadas) */
+  segundosEvidenciaManual?: () => number;
   /** Segundo factor: atributos registrados frente a observados (marca, color, tipo) */
   compararVehiculo(registrado: Fila, observado: Observacion): { resultado: 'coincide' | 'no_coincide' | 'sin_datos'; detalle: string };
   avisos: {
@@ -858,16 +875,37 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       if (ficha) ingreso.valor.ficha = { ...ingreso.valor.ficha, ...ficha };
       const direccion = camaraId === null ? 'ingreso' : await d.repositorio.direccionCamara(camaraId);
       if (direccion === null) throw errorValidacion('La cámara seleccionada no existe o no tiene una dirección válida.');
+      if (direccion === 'salida' && !d.salidaManual()) throw errorProhibido('El registro manual de salidas está desactivado en Configuración: lo hace la cámara de salida.');
       // Foto elegida de los últimos 30 s de la cámara: se guarda antes de crear el registro
       let rutaImagen: string | null = null;
+      let rutaImagenPlaca: string | null = null;
+      let notaFoto = '';
+      // Cámara del registro: la elegida o, en un ingreso sin cámara, la única de ingreso (la evidencia
+      // automática sale de ella y el registro queda asociado a ella)
+      let camaraRegistro = camaraId;
       if (cuadroT !== null && camaraId !== null) {
         rutaImagen = d.evidenciaManual ? await d.evidenciaManual.guardar(camaraId, cuadroT) : null;
         if (!rutaImagen) throw errorValidacion('La foto elegida ya no está en los últimos 30 s de la cámara. Elija otra o registre sin foto.');
+        notaFoto = ' · con foto de evidencia';
+      } else {
+        // Sin foto elegida: la cámara aporta sola la placa más legible de los últimos segundos y el
+        // vehículo en ese momento. Una falla del motor no impide registrar el paso.
+        const segundos = d.segundosEvidenciaManual?.() ?? 0;
+        const hayAutomatica = segundos > 0 && Boolean(d.evidenciaManual?.automatica);
+        const camara = camaraId ?? (hayAutomatica ? await d.repositorio.camaraIngresoUnica?.() ?? null : null);
+        const ev = hayAutomatica && camara !== null
+          ? await d.evidenciaManual!.automatica!(camara, segundos).catch(() => null)
+          : null;
+        if (ev && (ev.rutaVehiculo || ev.rutaPlaca)) {
+          rutaImagen = ev.rutaVehiculo;
+          rutaImagenPlaca = ev.rutaPlaca;
+          camaraRegistro = camara;
+          notaFoto = ` · fotos automáticas de la cámara (${ev.rutaPlaca ? 'placa y vehículo' : 'vehículo, sin placa visible'}`
+            + `${ev.placaLeida ? `; la cámara leyó ${ev.placaLeida}` : ''})`;
+        }
       }
-      const conFoto = rutaImagen ? { rutaImagen } : {};
-      const notaFoto = rutaImagen ? ' · con foto de evidencia' : '';
+      const conFoto = { ...(rutaImagen ? { rutaImagen } : {}), ...(rutaImagenPlaca ? { rutaImagenPlaca } : {}) };
       if (direccion === 'salida') {
-        if (!d.salidaManual()) throw errorProhibido('El registro manual de salidas está desactivado en Configuración: lo hace la cámara de salida.');
         if (camaraId === null) throw errorValidacion('La salida manual requiere una cámara configurada como salida.');
         const id = await d.repositorio.crearSalidaManual({ placa, camaraId, usuarioId: actor.id, ...conFoto });
         await d.auditoria.operacion(actor, 'REGISTRO_SALIDA_MANUAL', 'deteccion', id, `${placa} · ${motivo}${notaFoto}`);
@@ -882,7 +920,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       }
       const decision = decidirAcceso({ origen: 'manual', ...entradaListas(cruce), politica: d.politica() });
       const id = await d.repositorio.crearManual({
-        placa, camaraId, tipo: ingreso.valor.tipo || tipoVehiculo || cruce.permiso?.tipo_vehiculo || null,
+        placa, camaraId: camaraRegistro, tipo: ingreso.valor.tipo || tipoVehiculo || cruce.permiso?.tipo_vehiculo || null,
         marca: ingreso.valor.marca ?? marca, usuarioId: actor.id, ...conFoto,
       }, cruce, decision);
       if (hayDatosIngreso(ingreso.valor)) await d.repositorio.guardarDatosIngreso(id, ingreso.valor);

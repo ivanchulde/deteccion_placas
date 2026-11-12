@@ -44,6 +44,8 @@ def get_detector_vehiculos() -> Optional[Callable[[np.ndarray], list[Deteccion]]
     def detectar(cuadro: np.ndarray) -> list[Deteccion]:
         with _candado:
             r = modelo.predict(cuadro, imgsz=640, conf=0.25, classes=list(_CLASES), verbose=False, device="cpu")[0]
+        if r.boxes is None:
+            return []
         return [(_CLASES[int(c)], float(p), [float(v) for v in b])
                 for b, c, p in zip(r.boxes.xyxy.tolist(), r.boxes.cls.tolist(), r.boxes.conf.tolist())]
 

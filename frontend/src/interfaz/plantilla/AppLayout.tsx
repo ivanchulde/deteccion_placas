@@ -12,6 +12,7 @@ import { iniciales, ROLES } from '../../dominio/formato';
 import { Cargando } from '../componentes/ui';
 import { AvisosAcceso } from '../componentes/AvisosAcceso';
 import { CampanaNotificaciones } from '../componentes/CentroNotificaciones';
+import { BotonMensajes } from '../componentes/Mensajeria';
 import { alCambiarSonido, fijarSonido, sonidoActivo } from '../../infraestructura/avisos';
 import { itemDeRuta, menuPara, pestanasPara } from './navegacion';
 import logo from '../../assets/ecu911.png';
@@ -230,8 +231,28 @@ const Header: React.FC<{ onMenuMovil: () => void }> = ({ onMenuMovil }) => {
   const { conectado } = useTiempoReal();
   const { puede } = useAuth();
   const item = itemDeRuta(pathname, puede);
+  // Alto visible bajo el encabezado, para las vistas que deben caber en la pantalla sin scroll (p. ej.
+  // el panel del guardia). El encabezado cambia de alto al pasar a dos líneas, y en escritorio el
+  // body tiene zoom 0,8: el valor se publica en px de CSS (lo medido en pantalla dividido por el zoom).
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const publicar = () => {
+      const zoom = Number.parseFloat(getComputedStyle(document.body).zoom) || 1;
+      const encabezado = el.getBoundingClientRect().height;
+      const raiz = document.documentElement.style;
+      raiz.setProperty('--alto-encabezado', `${Math.round(encabezado / zoom)}px`);
+      raiz.setProperty('--alto-visible', `${Math.floor((window.innerHeight - encabezado) / zoom)}px`);
+    };
+    publicar();
+    window.addEventListener('resize', publicar);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publicar);
+    ro?.observe(el);
+    return () => { window.removeEventListener('resize', publicar); ro?.disconnect(); };
+  }, []);
   return (
-    <header className="header">
+    <header className="header" ref={ref}>
       <div className="header-fila">
         <button className="btn btn-ghost btn-icono header-menu-movil" onClick={onMenuMovil} aria-label="Abrir menú"><Menu size={20} /></button>
         <div className="header-titulo" title={item?.descripcion}>
@@ -249,6 +270,7 @@ const Header: React.FC<{ onMenuMovil: () => void }> = ({ onMenuMovil }) => {
           <div className="header-herramientas" role="group" aria-label="Herramientas del sistema">
             <BotonTema />
             <BotonSonido />
+            <BotonMensajes />
             <CampanaNotificaciones />
           </div>
           <MenuUsuario />

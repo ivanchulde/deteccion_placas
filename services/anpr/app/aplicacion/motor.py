@@ -33,6 +33,7 @@ import numpy as np
 from app.aplicacion.detector import _ESTADOS_FINALES, compute_crop_sharpness, placa_con_guion
 from app.dominio.latencia import Cronometros, VentanaDescartes, VentanaLatencia
 from app.aplicacion.consolidacion import PasoReciente, Vista, lectura_legible, lee_mejor, mismo_paso, paso_mas_cercano
+from app.aplicacion.evidencia_reciente import PlacasRecientes
 from app.aplicacion.historial_cuadros import HistorialCuadros
 from app.aplicacion.movimiento import DetectorMovimiento
 from app.aplicacion.calidad_captura import CalidadCaptura, medir_placa
@@ -203,7 +204,7 @@ class ConfigMotor:
     registro_paralelo: bool = True
     #: Análisis del vehículo iniciado al aparecer la placa completa (False: al registrar)
     vehiculo_anticipado: bool = True
-    #: La clasificación visual del vehículo no se usa mientras su precisión no esté validada.
+    #: Clasificación de tipo habilitada explícitamente por la configuración de producción.
     analizar_vehiculo: bool = False
     #: Fotos de un mismo track que se prueban antes de descartarlo (1: sin reintento)
     intentos_captura: int = MAX_INTENTOS_CAPTURA
@@ -393,6 +394,8 @@ class MotorAnpr:
         self._calidad = CalidadCaptura()
         #: Últimos 30 s de la cámara (2 cuadros por segundo) para la evidencia del registro manual
         self._historial = HistorialCuadros()
+        #: Placas vistas en los últimos 30 s (recortes): foto automática de la placa del registro manual
+        self._placas_recientes = PlacasRecientes()
         #: Hora de captura de los últimos cuadros analizados (índice → hora), para el registro
         self._horas_cuadro: dict[int, float] = {}
         #: Último cuadro de cada pista hasta el que se buscaron cuadros que rescatar
@@ -511,6 +514,44 @@ class MotorAnpr:
         with open(os.path.join(self._dir_media, nombre), "wb") as archivo:
             archivo.write(jpeg)
         return f"/media/{nombre}"
+
+    def evidencia_reciente(self, segundos: float) -> Optional[dict]:
+        """Fotos automáticas del registro manual: la placa más legible que el detector vio en los
+        últimos `segundos` (recorte) y el cuadro completo del vehículo en ese momento. Sin placa
+        vista, solo el cuadro más reciente. None si la cámara no entregó cuadros en ese lapso."""
+        ahora = time.time()
+        segundos = max(1.0, min(30.0, float(segundos)))
+        vista = self._placas_recientes.mejor(ahora - segundos)
+        foto = self._historial.foto(vista.hora, tolerancia_s=1.0) if vista else None
+        hora_foto = vista.hora if foto is not None else None
+        if foto is None:
+            ultima = self._historial.ultima()
+            if ultima is not None and ahora - ultima[0] <= segundos:
+                hora_foto, foto = ultima
+        if foto is None and vista is None:
+            return None
+        sello = time.strftime("%Y%m%d_%H%M%S", time.localtime(hora_foto or vista.hora))
+        os.makedirs(self._dir_media, exist_ok=True)
+        ruta_vehiculo = ruta_placa = None
+        if foto is not None:
+            nombre = f"manual_vehiculo_{sello}_{self.camara_id}.jpg"
+            with open(os.path.join(self._dir_media, nombre), "wb") as archivo:
+                archivo.write(foto)
+            ruta_vehiculo = f"/media/{nombre}"
+        placa_leida = None
+        if vista is not None:
+            nombre = f"manual_placa_{sello}_{self.camara_id}.jpg"
+            if cv2.imwrite(os.path.join(self._dir_media, nombre), vista.recorte, [cv2.IMWRITE_JPEG_QUALITY, 95]):
+                ruta_placa = f"/media/{nombre}"
+            with self._candado:
+                placa_leida = self._placa_de_pista.get(vista.tracking_id)
+        return {
+            "ruta_vehiculo": ruta_vehiculo, "ruta_placa": ruta_placa,
+            "hace_s": round(ahora - (vista.hora if vista else hora_foto), 1),
+            "ancho_placa_px": vista.ancho_px if vista else None,
+            "confianza_deteccion": round(vista.confianza, 3) if vista else None,
+            "placa_leida": placa_leida,
+        }
 
     def pistas_actuales(self) -> dict:
         """Cajas de detección vigentes y zona de movimiento, normalizadas a 0–1 respecto del
@@ -685,6 +726,7 @@ class MotorAnpr:
                 rois = pipeline.detect_and_track(frame, imgsz=512)
                 self._seguidor.anclar(pipeline.cajas_hud(), idx, hora)
                 activos = {roi.tracking_id for roi in rois}
+                self._placas_recientes.ofrecer(hora, frame, rois)
                 self._registrar_vistas(rois, hora)
                 self._renovar_pasos(activos)
                 self._m.update_tracking_active(len(activos), str(self.camara_id))
@@ -991,6 +1033,7 @@ class MotorAnpr:
                     self._pipeline.clear_all_tracks()
                 self._seguidor.reiniciar()
                 self._historial.reiniciar()
+                self._placas_recientes.reiniciar()
                 self._movimiento_vigilante = DetectorMovimiento()
                 if self._selector:
                     for registro in ("_active_candidates", "_captured_history", "_prev_area", "_track_first_seen"):

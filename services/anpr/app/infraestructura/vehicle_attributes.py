@@ -33,8 +33,11 @@ from app.infraestructura.config import (
     VEHICLE_CLIP_MODEL,
     VEHICLE_CLIP_PRETRAINED,
     VEHICLE_DETECTOR_PATH,
+    VEHICLE_TYPE_ENABLED,
 )
 from app.infraestructura.logger import get_logger
+from app.infraestructura.vehiculos_coco import Deteccion as DeteccionVehiculo
+from app.infraestructura.vehiculos_coco import get_detector_vehiculos
 
 logger = get_logger("vehicle_attributes")
 
@@ -69,12 +72,45 @@ def vehicle_box_for_plate(boxes: list[tuple[list[float], int, float]], plate_bbo
     return min(contenedoras, key=lambda bc: (bc[0][2] - bc[0][0]) * (bc[0][3] - bc[0][1]))
 
 
+def vehicle_detection_for_plate(
+    detections: list[DeteccionVehiculo], plate_bbox: list[int],
+) -> Optional[DeteccionVehiculo]:
+    """Devuelve la detección más pequeña que contiene el centro de la placa."""
+    px = (plate_bbox[0] + plate_bbox[2]) / 2
+    py = (plate_bbox[1] + plate_bbox[3]) / 2
+    containing = [
+        detection for detection in detections
+        if detection[2][0] <= px <= detection[2][2] and detection[2][1] <= py <= detection[2][3]
+    ]
+    if not containing:
+        return None
+    return min(
+        containing,
+        key=lambda detection: (detection[2][2] - detection[2][0]) * (detection[2][3] - detection[2][1]),
+    )
+
+
 def estimated_vehicle_box(plate_bbox: list[int], frame_shape: tuple[int, ...]) -> list[int]:
     """Sin detección del vehículo: región típica alrededor de la placa (frontal o trasera)."""
     x1, y1, x2, y2 = plate_bbox
     pw, ph = x2 - x1, y2 - y1
     h, w = frame_shape[:2]
     return [max(0, int(x1 - 1.6 * pw)), max(0, int(y1 - 4.5 * ph)), min(w, int(x2 + 1.6 * pw)), min(h, int(y2 + 1.5 * ph))]
+
+
+class VehicleTypeRecognizer:
+    """Clasifica el tipo con COCO y lo asocia a la placa por contención espacial."""
+
+    def __init__(self, detector: Callable[[np.ndarray], list[DeteccionVehiculo]]) -> None:
+        self._detector = detector
+
+    def analyze(self, frame: np.ndarray, plate_bbox: list[int]) -> VehicleAttributes:
+        attrs = VehicleAttributes()
+        detection = vehicle_detection_for_plate(self._detector(frame), plate_bbox)
+        if detection is not None:
+            attrs.tipo, attrs.tipo_conf, _ = detection
+            attrs.fuente_caja = "detector"
+        return attrs
 
 
 class VehicleAttributeRecognizer:
@@ -158,6 +194,22 @@ class VehicleAttributeRecognizer:
 _instance: Optional[VehicleAttributeRecognizer] = None
 _state_lock = threading.Lock()
 _failed = False
+_type_instance: Optional[VehicleTypeRecognizer] = None
+_type_state_lock = threading.Lock()
+
+
+def get_vehicle_type_recognizer() -> Optional[VehicleTypeRecognizer]:
+    """Reconocedor liviano auto/moto; no carga CLIP ni los atributos opcionales."""
+    global _type_instance
+    if not VEHICLE_TYPE_ENABLED:
+        return None
+    if _type_instance is None:
+        with _type_state_lock:
+            if _type_instance is None:
+                detector = get_detector_vehiculos()
+                if detector is not None:
+                    _type_instance = VehicleTypeRecognizer(detector)
+    return _type_instance
 
 
 def get_vehicle_recognizer() -> Optional[VehicleAttributeRecognizer]:
