@@ -22,6 +22,8 @@ from typing import Callable, Optional
 
 import numpy as np
 
+from app.aplicacion.movimiento import Movimiento
+
 #: Motivos que el motor envía como evidencia del paso (el backend los explica al personal)
 MOTIVO_SIN_PLACA = "vehiculo_sin_placa"
 #: Hubo una detección con forma de placa (p. ej. el emblema de un auto nuevo) pero ninguna lectura
@@ -63,6 +65,8 @@ class EventoMovimiento:
     placa_vista: bool = False
     #: Cuadros analizados con movimiento durante el evento
     muestras: int = 1
+    #: Máscara del mismo cuadro guardado, para separar el vehículo del movimiento ajeno.
+    movimientos: dict[float, Movimiento] = field(default_factory=dict)
 
     @property
     def duracion_s(self) -> float:
@@ -84,18 +88,22 @@ class VigilanteSinPlaca:
         """Olvida el evento en curso (al cambiar de cámara o de zonas)."""
         self._evento = None
 
-    def _guardar(self, hora: float, fraccion: float, cuadro: Optional[np.ndarray]) -> None:
+    def _guardar(self, hora: float, fraccion: float, cuadro: Optional[np.ndarray], movimiento: Optional[Movimiento]) -> None:
         """Conserva cuadros repartidos en todo el evento: lleno, se quita el más próximo en el tiempo a
         su anterior (el primero se queda: suele ser el vehículo entero acercándose)."""
         if cuadro is None or fraccion < self.p.fraccion_vehiculo:
             return
-        cuadros = self._evento.cuadros
+        evento = self._evento
+        cuadros = evento.cuadros
         cuadros.append((hora, fraccion, cuadro.copy()))
+        if movimiento is not None:
+            evento.movimientos[hora] = movimiento
         if len(cuadros) > self.p.cuadros_guardados:
-            cuadros.pop(min(range(1, len(cuadros)), key=lambda i: cuadros[i][0] - cuadros[i - 1][0]))
+            hora_retirada, _, _ = cuadros.pop(min(range(1, len(cuadros)), key=lambda i: cuadros[i][0] - cuadros[i - 1][0]))
+            evento.movimientos.pop(hora_retirada, None)
 
     def alimentar(self, hora: float, fraccion: float, cuadro: Optional[np.ndarray] = None,
-                  placa_vista: bool = False) -> Optional[EventoMovimiento]:
+                  placa_vista: bool = False, movimiento: Optional[Movimiento] = None) -> Optional[EventoMovimiento]:
         """
         Fracción de la zona en movimiento del cuadro a la `hora` (s) y si el detector de placas vio hace
         poco algo con forma de placa. El motor lo alimenta 6 veces por segundo desde el hilo de captura.
@@ -115,11 +123,11 @@ class VigilanteSinPlaca:
             else:
                 self._evento.fraccion_max = max(self._evento.fraccion_max, fraccion)
                 self._evento.placa_vista = self._evento.placa_vista or placa_vista
-                self._guardar(hora, fraccion, cuadro)
+                self._guardar(hora, fraccion, cuadro, movimiento)
         if self._evento is None and cerrado is None and fraccion >= p.fraccion_inicio:
             self._evento = EventoMovimiento(inicio=hora, fin=hora, fraccion_max=fraccion, placa_vista=placa_vista)
             self._ultimo_movimiento = hora
-            self._guardar(hora, fraccion, cuadro)
+            self._guardar(hora, fraccion, cuadro, movimiento)
         if cerrado is None:
             return None
         if (cerrado.fraccion_max >= p.fraccion_vehiculo and cerrado.duracion_s >= p.duracion_min_s

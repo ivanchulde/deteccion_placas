@@ -33,6 +33,9 @@ import numpy as np
 from app.aplicacion.detector import _ESTADOS_FINALES, compute_crop_sharpness, placa_con_guion
 from app.dominio.latencia import Cronometros, VentanaDescartes, VentanaLatencia
 from app.aplicacion.consolidacion import PasoReciente, Vista, lectura_legible, lee_mejor, mismo_paso, paso_mas_cercano
+from app.aplicacion.contexto_vehicular import (
+    FRACCION_MOVIMIENTO_PLACA, FRACCION_MOVIMIENTO_VEHICULO, MarcoVehicular, Vehiculo, vehiculo_de_placa, zona_en_vehiculos,
+)
 from app.aplicacion.evidencia_reciente import PlacasRecientes
 from app.aplicacion.historial_cuadros import HistorialCuadros
 from app.aplicacion.movimiento import DetectorMovimiento
@@ -113,6 +116,10 @@ _SEPARACION_RESCATE = 3
 _HUECO_MIN_RESCATE = 4
 #: Las fotos que quedan de una pista que salió se olvidan pasado este tiempo
 _VIGENCIA_FOTOS_S = 30.0
+# Una inferencia vehicular sirve para todas las placas del cuadro. La captura de video no la espera.
+_MUESTREO_VEHICULO_MOVIL_S = 0.30
+_MUESTREO_VEHICULO_QUIETO_S = 0.80
+_VIGENCIA_VEHICULOS_HUD_S = 1.25
 
 
 def vehiculo_entero(caja, ancho: int, alto: int, margen: float = 0.01) -> bool:
@@ -257,7 +264,7 @@ class DependenciasMotor:
     #: Métricas Prometheus (update_fps, record_detection…)
     metricas: Any
     logger: Any
-    #: Detector de vehículos COCO para los pasos sin placa: función cuadro -> [(tipo, confianza, caja)], o None
+    #: Detector de vehículos COCO: función cuadro -> [(tipo, confianza, caja)], o None
     detector_vehiculos: Callable[[], Any] = lambda: None
 
 
@@ -345,6 +352,8 @@ class MotorAnpr:
         self._intentos_captura: dict[int, tuple[int, float]] = {}
         #: Análisis del vehículo iniciado por adelantado para cada track en movimiento: (futuro, hora)
         self._vehiculos: dict[int, tuple[Future, float]] = {}
+        self._marco_vehicular: Optional[MarcoVehicular] = None
+        self._pistas_con_movimiento_vehicular: set[int] = set()
         #: Pistas con el paso ya resuelto (registrado, consolidado por el backend o descartado tras
         #: agotar los intentos): no se vuelven a disparar mientras sigan vivas, aunque el vehículo
         #: siga detenido frente a la cámara. Los ids de pista no se repiten dentro del proceso.
@@ -562,14 +571,19 @@ class MotorAnpr:
         pipeline = self._pipeline
         if not pipeline or not w or not h:
             return {"pistas": [], "roi": pipeline.roi if pipeline else None,
-                    "exclusiones": pipeline.exclusiones if pipeline else [], "movimiento": None}
+                    "exclusiones": pipeline.exclusiones if pipeline else [], "vehiculos": [], "movimiento": None}
         ahora = time.time()
+        marco = self._marco_vigente((h, w), ahora)
+        permitidas = marco.pistas if marco else frozenset()
         with pipeline._overlays_lock:
-            cajas = [ov for ov in pipeline._current_overlays if ahora - ov.timestamp < 1.0]
+            cajas = [ov for ov in pipeline._current_overlays if ov.tracking_id in permitidas and ahora - ov.timestamp < 1.0]
         seguidas = self._seguidor.pistas()
 
         def n(x: float, total: int) -> float:
             return round(max(0.0, min(1.0, x / total)), 4)
+
+        def normalizar_caja(caja) -> list[float]:
+            return [n(caja[0], w), n(caja[1], h), n(caja[2], w), n(caja[3], h)]
 
         candidatas = []
         for ov in cajas:
@@ -605,14 +619,19 @@ class MotorAnpr:
                 "estado": ov.estado or None,
                 "verificada": ov.verificada,
             })
-        caja, porcentaje, vehiculo = pipeline.get_motion_info()
         movimiento = None
-        if caja and vehiculo and porcentaje > 3:
-            movimiento = {"caja": [n(caja[0], w), n(caja[1], h), n(caja[2], w), n(caja[3], h)], "porcentaje": porcentaje}
+        if marco and marco.movimiento:
+            caja, porcentaje = marco.movimiento
+            movimiento = {"caja": normalizar_caja(caja), "porcentaje": porcentaje}
+        vehiculos = [{"tipo": tipo, "caja": normalizar_caja(caja)} for tipo, _, caja in marco.vehiculos] if marco else []
         # Proporción del cuadro que analiza el motor: el navegador avisa si la vista (flujo
         # secundario) tiene otra y los recuadros no coincidirían con el video
         return {"pistas": pistas, "roi": pipeline.roi, "exclusiones": pipeline.exclusiones,
-                "movimiento": movimiento, "aspecto": round(w / h, 4)}
+                "vehiculos": vehiculos, "movimiento": movimiento, "aspecto": round(w / h, 4)}
+
+    def _marco_vigente(self, forma: tuple[int, int], ahora: float) -> Optional[MarcoVehicular]:
+        marco = self._marco_vehicular
+        return marco if marco and marco.forma == forma and ahora - marco.hora < _VIGENCIA_VEHICULOS_HUD_S else None
 
     # ─── Ciclo de vida ──────────────────────────────────────────────────────
 
@@ -722,29 +741,89 @@ class MotorAnpr:
             ultimo_procesado = idx
 
             try:
-                # 1. Detección y seguimiento (actualiza los overlays del pipeline @ 512 px)
-                rois = pipeline.detect_and_track(frame, imgsz=512)
-                self._seguidor.anclar(pipeline.cajas_hud(), idx, hora)
-                activos = {roi.tracking_id for roi in rois}
-                self._placas_recientes.ofrecer(hora, frame, rois)
-                self._registrar_vistas(rois, hora)
-                self._renovar_pasos(activos)
-                self._m.update_tracking_active(len(activos), str(self.camara_id))
-                self._m.record_inference("rtsp", pipeline.inferencia_omitida("rtsp"))
-
-                # 2. OCR asíncrono de cada track y análisis anticipado del vehículo
-                self._leer_placas(pipeline, rois, frame, hora)
-
-                # 3. Calidad del cuadro y disparo de la captura fotográfica, con los cuadros que el
-                #    detector no alcanzó a analizar desde el análisis anterior
-                self._rescatar_cuadros(selector, rois, idx)
-                self._evaluar_capturas(selector, rois, frame, idx)
-
-                # 4. Vehículos sin placa visible: movimiento en la zona sin un paso registrado
-                self._vigilar_sin_placa(pipeline, rois, frame, hora)
+                self._procesar_cuadro(pipeline, selector, frame, idx, hora)
             except Exception as e:
                 self._log.error("Error en hilo de detección desacoplado: %s", e)
                 self._m.record_detection_error("deteccion")
+
+    def _procesar_cuadro(self, pipeline: Any, selector: Any, frame: np.ndarray, idx: int, hora: float) -> None:
+        fuente = self._fuente
+        rois = pipeline.detect_and_track(frame, imgsz=512)
+        confirmadas, activas = self._confirmar_contexto(pipeline, frame, rois, hora, fuente)
+        if fuente is not self._fuente:
+            return
+        self._seguidor.anclar({tid: caja for tid, caja in pipeline.cajas_hud().items() if tid in activas}, idx, hora)
+        self._placas_recientes.ofrecer(hora, frame, confirmadas)
+        self._registrar_vistas(confirmadas, hora)
+        self._renovar_pasos(activas)
+        self._m.update_tracking_active(len(activas), str(self.camara_id))
+        self._m.record_inference("rtsp", pipeline.inferencia_omitida("rtsp"))
+        self._leer_placas(pipeline, confirmadas, frame, hora)
+        if confirmadas:
+            self._rescatar_cuadros(selector, confirmadas, idx)
+        self._evaluar_capturas(selector, confirmadas, frame, idx, activas)
+        self._vigilar_sin_placa(pipeline, confirmadas, frame, hora)
+
+    def _cajas_vehiculares(self, pipeline: Any, frame: np.ndarray,
+                           placas: Sequence[Sequence[float]] = ()) -> tuple[Vehiculo, ...]:
+        detectar = self._dep.detector_vehiculos()
+        if detectar is None:
+            return ()
+        h, w = frame.shape[:2]
+        roi = np.array([[x * w, y * h] for x, y in pipeline.roi], np.float32) if pipeline.roi else None
+        exclusiones = [np.array([[x * w, y * h] for x, y in zona], np.float32) for zona in pipeline.exclusiones]
+        cajas = []
+        for tipo, confianza, (x1, y1, x2, y2) in detectar(frame):
+            if confianza < self._config.confianza_vehiculo_min or x2 <= x1 or y2 - y1 < self._config.alto_vehiculo_min * h:
+                continue
+            vehiculo = (tipo, confianza, (x1, y1, x2, y2))
+            # Una ROI estrecha puede contener la placa válida y dejar las ruedas fuera.
+            if (punto_permitido((x1 + x2) / 2, min(y2, h - 1), roi, exclusiones)
+                    or any(vehiculo_de_placa((vehiculo,), placa) is not None for placa in placas)):
+                cajas.append(vehiculo)
+        return tuple(cajas)
+
+    def _confirmar_contexto(self, pipeline: Any, frame: np.ndarray, rois: list, hora: float, fuente: Any) -> tuple[list, set[int]]:
+        """El OCR y el selector reciben solo placas comprobadas sobre un vehículo del mismo cuadro.
+
+        Entre muestras se mantiene el seguimiento de las pistas aceptadas, sin añadir fotos al
+        selector. Cuando el vehículo se detiene, la pista conserva la evidencia de su movimiento.
+        """
+        mov = pipeline.ultimo_movimiento()
+        ids = {roi.tracking_id for roi in rois}
+        forma = frame.shape[:2]
+        anterior = self._marco_vehicular
+        intervalo = _MUESTREO_VEHICULO_MOVIL_S if mov and mov.fraccion > 0 else _MUESTREO_VEHICULO_QUIETO_S
+        if anterior and anterior.forma == forma and 0 <= hora - anterior.hora < intervalo:
+            return [], ids.intersection(anterior.pistas)
+        if anterior and anterior.forma == forma and not anterior.vehiculos and not rois and not (mov and mov.fraccion > 0):
+            return [], set()
+
+        try:
+            vehiculos = self._cajas_vehiculares(pipeline, frame, [roi.plate_bbox for roi in rois])
+        except Exception as error:
+            self._log.warning("No se pudo comprobar el vehículo del cuadro: %s", error)
+            self._m.record_detection_error("contexto_vehicular")
+            vehiculos = ()
+        moviles = {i for i, (_, _, caja) in enumerate(vehiculos)
+                   if mov and mov.fraccion_en(caja) >= FRACCION_MOVIMIENTO_VEHICULO}
+        asociadas = [(roi, vehiculo_de_placa(vehiculos, roi.plate_bbox)) for roi in rois]
+        if mov:
+            moviles.update(i for roi, i in asociadas if i is not None and mov.fraccion_en(roi.plate_bbox) >= FRACCION_MOVIMIENTO_PLACA)
+        zona = zona_en_vehiculos(mov.caja, [vehiculos[i][2] for i in moviles]) if mov and mov.caja else None
+        with self._candado:
+            if fuente is not self._fuente:
+                return [], set()
+            vistas = self._pistas_con_movimiento_vehicular
+            vistas.intersection_update(ids)
+            confirmadas = []
+            for roi, vehiculo in asociadas:
+                if vehiculo is not None and (vehiculo in moviles or roi.tracking_id in vistas):
+                    vistas.add(roi.tracking_id)
+                    confirmadas.append(roi)
+            activas = {roi.tracking_id for roi in confirmadas}
+            self._marco_vehicular = MarcoVehicular(hora, forma, vehiculos, frozenset(activas), (zona, mov.porcentaje) if zona and mov else None)
+        return confirmadas, activas
 
     def _tomar_cuadro(self) -> Optional[tuple[np.ndarray, int, float]]:
         """El cuadro más reciente aún no analizado, con su índice y su hora de captura (None si no
@@ -855,12 +934,14 @@ class MotorAnpr:
                 if len(elegidos) == _CUADROS_RESCATE:
                     break
             for i, hora, imagen, c, _ in sorted(elegidos, key=lambda m: m[0]):
+                if self._pipeline and vehiculo_de_placa(self._cajas_vehiculares(self._pipeline, imagen, [c]), c) is None:
+                    continue
                 self._horas_cuadro[i] = hora
                 selector.evaluate_and_select(tracking_id=tid, frame=imagen, plate_bbox=c, confidence=roi.confidence,
                                              frame_idx=i, solo_acumular=True)
             self._rescate["cuadros"] += len(elegidos)
 
-    def _evaluar_capturas(self, selector: Any, rois: list, frame: np.ndarray, idx: int) -> None:
+    def _evaluar_capturas(self, selector: Any, rois: list, frame: np.ndarray, idx: int, activas: Optional[set[int]] = None) -> None:
         """Mejor cuadro de cada track y tracks que salieron de cuadro → compuerta de captura. De una
         pista que salió el selector entrega hasta 3 fotos: se lee la mejor y, si no se lee, la siguiente
         (antes las otras dos chocaban con el anti-rebote de la pista y se perdían)."""
@@ -872,7 +953,7 @@ class MotorAnpr:
             if elegido is not None:
                 self.disparar_captura(elegido)
         salidas: dict[int, list] = {}
-        for salido in selector.cleanup_stale_tracks({roi.tracking_id for roi in rois}):
+        for salido in selector.cleanup_stale_tracks(activas if activas is not None else {roi.tracking_id for roi in rois}):
             salidas.setdefault(salido.tracking_id, []).append(salido)
         ahora = time.time()
         with self._candado:
@@ -953,7 +1034,9 @@ class MotorAnpr:
                 t_hud = time.perf_counter()
                 # La caja que el seguidor acaba de llevar a este mismo cuadro: queda sobre la placa
                 posiciones = {tid: (p.caja, p.puntos) for tid, p in self._seguidor.pistas().items() if p.indice == self._indice_cuadro}
-                anotado = pipeline.draw_overlays(frame.copy(), capture_fps=self._fps_captura, inference_fps=pipeline.fps, posiciones=posiciones)
+                marco = self._marco_vigente(frame.shape[:2], time.time()) or MarcoVehicular(0.0, frame.shape[:2], (), frozenset())
+                anotado = pipeline.draw_overlays(frame, capture_fps=self._fps_captura, inference_fps=pipeline.fps,
+                                                posiciones=posiciones, marco_vehicular=marco)
                 self._tiempos.registrar("dibujo_hud", time.perf_counter() - t_hud)
                 self.buffer_video.update(anotado)
                 if ventana and not self._dep.mostrar_ventana("ANPR ECU 911 - Stream en Vivo (Scout)", anotado):
@@ -1021,6 +1104,8 @@ class MotorAnpr:
                     self._placas_registradas.clear()
                     self._placa_de_pista.clear()
                     self._pistas_activas = set()
+                    self._marco_vehicular = None
+                    self._pistas_con_movimiento_vehicular.clear()
                     self._crudos_rapidos.clear()
                 self._vigilante.reiniciar()
                 with self._candado:
@@ -1297,7 +1382,7 @@ class MotorAnpr:
         vigilante de pasos sin placa; un evento cerrado se revisa aparte."""
         pipeline = self._pipeline
         mov = self._movimiento_vigilante.analizar(frame, pipeline.roi if pipeline else None, pipeline.exclusiones if pipeline else [])
-        evento = self._vigilante.alimentar(hora, mov.fraccion, frame, hora - self._placa_vista_hora < _PLACA_VISTA_S)
+        evento = self._vigilante.alimentar(hora, mov.fraccion, frame, hora - self._placa_vista_hora < _PLACA_VISTA_S, movimiento=mov)
         if evento is not None:
             self._ejecutor_reevaluacion.submit(self._evaluar_sin_placa, evento, self.camara_id)
 
@@ -1352,13 +1437,16 @@ class MotorAnpr:
         roi = self._pipeline.roi if self._pipeline else None
         exclusiones = self._pipeline.exclusiones if self._pipeline else []
         mejor, mejor_entero = None, False
-        for _, _, cuadro in evento.cuadros:
+        for hora, _, cuadro in evento.cuadros:
             alto, ancho = cuadro.shape[:2]
+            movimiento = evento.movimientos.get(hora)
             roi_px = np.array([[x * ancho, y * alto] for x, y in roi], np.float32) if roi else None
             excl_px = [np.array([[x * ancho, y * alto] for x, y in z], np.float32) for z in exclusiones]
             for tipo, conf, caja in detectar(cuadro):
                 x1, y1, x2, y2 = caja
                 if conf < self._config.confianza_vehiculo_min or (y2 - y1) < self._config.alto_vehiculo_min * alto:
+                    continue
+                if movimiento is not None and movimiento.fraccion_en(caja) < FRACCION_MOVIMIENTO_VEHICULO:
                     continue
                 if not punto_permitido((x1 + x2) / 2, min(y2, alto - 1), roi_px, excl_px):
                     continue
@@ -1757,7 +1845,7 @@ class MotorAnpr:
             # verificador; su lectura llega después como reevaluación. Sin placa o con una foto dudosa
             # se espera al verificador como antes (es quien puede leerla o descartarla).
             # Una lectura con formato incoherente con la forma de la placa también espera al
-            # verificador: su lectura puede ser la correcta (PJF001 donde el OCR leyó PJ001).
+            # verificador: su lectura puede ser la correcta (PZX001 donde el OCR leyó PZ001).
             presupuesto = self._config.presupuesto_registro_s
             candidata = placa or (placa_previa if placa_previa and validate_ecuadorian_plate(placa_previa)[0] else "")
             limite_registro: Optional[float] = None

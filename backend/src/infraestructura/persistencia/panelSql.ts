@@ -80,14 +80,15 @@ export const repositorioPanelSql: RepositorioPanel = {
              AND fecha_vencimiento <= DATEADD(DAY, @dias, ${h})) AS autorizados_por_vencer,
           (SELECT COUNT(*) FROM ListaBlanca WHERE activo = 1 AND fecha_vencimiento < ${h}) AS autorizados_vencidos,
             (SELECT COUNT(*) FROM ListaNegra WHERE activo = 1 AND (fecha_vencimiento IS NULL OR fecha_vencimiento >= ${h})) AS alertas_vigentes`),
-      // Entradas y salidas son movimientos ocurridos hoy; «dentro» son ingresos autorizados
-      // todavía abiertos, aunque hayan ocurrido antes de hoy.
+      // Entradas y salidas son movimientos ocurridos hoy; «dentro» son los vehículos que ingresaron
+      // y todavía no registran salida (cualquier estado, aunque hayan entrado antes de hoy): cada
+      // entrada suma uno y cada salida resta uno, como «Siguen dentro» del historial completo.
       q(`SELECT
           COALESCE(SUM(CASE WHEN fecha_hora_ingreso >= @hoy AND fecha_hora_ingreso <= CURRENT_TIMESTAMP THEN 1 ELSE 0 END), 0) AS ingresos,
           COALESCE(SUM(CASE WHEN fecha_hora_ingreso >= @hoy AND fecha_hora_ingreso <= CURRENT_TIMESTAMP THEN 1 ELSE 0 END), 0) AS entradas,
           COALESCE(SUM(CASE WHEN fecha_hora_salida >= @hoy AND fecha_hora_salida <= CURRENT_TIMESTAMP
             AND fecha_hora_salida >= fecha_hora_ingreso THEN 1 ELSE 0 END), 0) AS salidas,
-          COALESCE(SUM(CASE WHEN estado_validacion = 'autorizado' AND fecha_hora_ingreso <= CURRENT_TIMESTAMP
+          COALESCE(SUM(CASE WHEN fecha_hora_ingreso <= CURRENT_TIMESTAMP
             AND fecha_hora_salida IS NULL THEN 1 ELSE 0 END), 0) AS dentro
         FROM DeteccionVehiculo d WHERE ${BASE} AND COALESCE(tipo_movimiento, 'ingreso') = 'ingreso'`),
       totalesHistoricos(),

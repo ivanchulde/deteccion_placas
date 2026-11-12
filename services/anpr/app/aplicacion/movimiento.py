@@ -22,7 +22,7 @@ movimiento ni hacen "moverse" a una pista.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
 import cv2
 import numpy as np
@@ -57,7 +57,7 @@ class Movimiento:
     mascara: Optional[np.ndarray]  # máscara reducida de movimiento (255 = movimiento)
     escala: float                  # px de la máscara por px del cuadro original
 
-    def fraccion_en(self, caja: list[int]) -> float:
+    def fraccion_en(self, caja: Sequence[float]) -> float:
         """Fracción de la caja (px del cuadro original) en movimiento en este cuadro."""
         if self.mascara is None:
             return 0.0

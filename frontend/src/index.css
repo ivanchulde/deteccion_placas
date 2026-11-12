@@ -1364,7 +1364,14 @@ button.indicador[aria-pressed="true"] { background: var(--surface-3); box-shadow
 /* Tabla del historial: filas claras, foto del vehículo, placa destacada y dos líneas por dato */
 .historial-tabla-tarjeta { overflow: hidden; }
 .tabla.tabla-historial th { position: sticky; top: 0; z-index: 1; }
-.tabla.tabla-historial td { padding: 10px 14px; }
+.tabla.tabla-historial td { padding: 9px 10px; }
+.tabla.tabla-historial th { padding-left: 10px; padding-right: 10px; }
+/* Columnas de texto del historial: anchos acotados para que la fila no crezca sin control */
+.tabla.tabla-historial .historial-col-nombre { min-width: 150px; max-width: 210px; }
+.tabla.tabla-historial .historial-col-texto { min-width: 110px; max-width: 170px; }
+.tabla.tabla-historial .historial-col-motivo { min-width: 150px; max-width: 240px; }
+.tabla.tabla-historial .historial-col-camara { min-width: 160px; }
+.historial-motivo-alerta { color: var(--alerta); font-weight: 600; }
 .tabla.tabla-historial .col-imagen { width: 104px; padding-right: 4px; }
 .historial-foto {
   display: flex; align-items: center; justify-content: center; width: 88px; height: 56px; padding: 0; overflow: hidden;

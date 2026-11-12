@@ -3,13 +3,13 @@ import { AlertTriangle, Loader2, Maximize2, PauseCircle, Radio, VideoOff } from 
 import api, { mensajeError } from '../../infraestructura/api';
 import { usePaginaVisible } from '../../aplicacion/hooks';
 import { conectarWhep, crearMedidor, ErrorWhep, EstadisticasVideo, SesionWhep } from '../../infraestructura/webrtc';
-import { areaVideo, crearHud, Hud, PistaHud, Punto } from './hud';
+import { areaVideo, crearHud, Hud, MovimientoHud, PistaHud, Punto, VehiculoHud } from './hud';
 import { Aviso, Modal, Segmentado } from './ui';
 
 /**
  * Video en vivo por WebRTC (MediaMTX) con el HUD de detección del motor ANPR dibujado encima.
  * El video no pasa por el motor: MediaMTX reenvía el H.264 de la cámara sin re-codificar, y el
- * motor solo envía por WebSocket las pistas y la zona de movimiento (JSON).
+ * motor envía por WebSocket los recuadros de vehículos, las pistas de placas y el movimiento.
  *
  * Cada placa en seguimiento se dibuja desde que aparece y sigue al vehículo: "ESCANEANDO OCR"
  * mientras se lee, la placa al leerla y el color del estado decidido por el backend (ver
@@ -36,14 +36,18 @@ interface PistaMotor {
   edad?: number;
   confianza?: number;
   placa?: string | null;
-  parcial?: string | null;
   confianza_placa?: number;
   estado?: string | null;
 }
 
-/** Pistas del WebSocket /ws/pistas del motor → HUD. */
-function pistasDelMotor(lista: PistaMotor[] | undefined): PistaHud[] {
-  return (lista ?? []).filter(p => Boolean(p.placa)).map(p => ({
+const esCaja = (caja: unknown): caja is PistaHud['caja'] => Array.isArray(caja) && caja.length === 4
+  && caja.every(v => typeof v === 'number' && v >= 0 && v <= 1)
+  && caja[0] < caja[2] && caja[1] < caja[3];
+
+/** En motores anteriores se muestran solo las placas que ya tienen lectura. */
+function pistasDelMotor(lista: PistaMotor[] | undefined, mostrarEscaneo: boolean): PistaHud[] {
+  if (!Array.isArray(lista)) return [];
+  return lista.filter(p => p && esCaja(p.caja) && (p.placa || mostrarEscaneo)).map(p => ({
     id: p.id,
     caja: p.caja,
     puntos: p.puntos ?? null,
@@ -51,10 +55,18 @@ function pistasDelMotor(lista: PistaMotor[] | undefined): PistaHud[] {
     edad: p.edad ?? 0,
     confianza: p.confianza ?? 0,
     placa: p.placa ?? null,
-    parcial: p.parcial ?? null,
+    parcial: null,
     confianzaPlaca: p.confianza_placa ?? 0,
     estado: p.estado ?? null,
   }));
+}
+
+function vehiculosDelMotor(lista: VehiculoHud[] | undefined): VehiculoHud[] {
+  return Array.isArray(lista) ? lista.filter(v => v && esCaja(v.caja) && typeof v.tipo === 'string') : [];
+}
+
+function movimientoDelMotor(m: MovimientoHud | null | undefined): MovimientoHud | null {
+  return m && esCaja(m.caja) && Number.isFinite(m.porcentaje) && m.porcentaje >= 0 && m.porcentaje <= 100 ? m : null;
 }
 
 const esPoligono = (z: unknown): z is Punto[] => Array.isArray(z) && z.length >= 3
@@ -252,7 +264,8 @@ export const ReproductorWebRTC: React.FC<{
                 const m = JSON.parse(ev.data);
                 if (typeof m.aspecto === 'number' && m.aspecto !== aspectoMotor) { aspectoMotor = m.aspecto; revisarAspecto(); }
                 const zonas = zonasDelMotor(m);
-                hud.actualizar(pistasDelMotor(m.pistas), null, zonas.roi, zonas.exclusiones);
+                const vehiculos = vehiculosDelMotor(m.vehiculos);
+                hud.actualizar(pistasDelMotor(m.pistas, vehiculos.length > 0), movimientoDelMotor(m.movimiento), zonas.roi, zonas.exclusiones, vehiculos);
               } catch { /* mensaje inválido */ }
             };
             // El motor se reinició o la cámara aún arranca: el video sigue y las cajas vuelven solas, con un ticket nuevo

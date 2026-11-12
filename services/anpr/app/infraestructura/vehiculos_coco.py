@@ -1,9 +1,8 @@
 """
-Detector de vehículos YOLO26n (COCO) para los pasos sin placa (app/aplicacion/paso_sin_placa.py).
+Detector compartido de vehículos YOLO26n (COCO).
 
-Corre una vez por evento de movimiento que el flujo de placas no registró, no en cada cuadro: confirma
-que lo que se movió en la zona es un auto, una moto, un bus o un camión (y no una persona). El modelo
-se carga la primera vez que se necesita; si no está disponible, el motor no registra pasos sin placa.
+Confirma la presencia de autos, motos, buses y camiones en los cuadros muestreados del flujo de placas
+y en la revisión de eventos sin placa. El modelo se carga una vez y se comparte entre cámaras.
 """
 
 from __future__ import annotations
@@ -33,10 +32,10 @@ def get_detector_vehiculos() -> Optional[Callable[[np.ndarray], list[Deteccion]]
             try:
                 from ultralytics import YOLO
                 _modelo = YOLO(VEHICLE_DETECTOR_PATH)
-                _log.info("Detector de vehículos para pasos sin placa: %s", VEHICLE_DETECTOR_PATH)
+                _log.info("Detector de vehículos listo: %s", VEHICLE_DETECTOR_PATH)
             except Exception as e:
                 _fallo = True
-                _log.warning("Sin detector de vehículos (%s): no se registrarán pasos sin placa", e)
+                _log.warning("Sin detector de vehículos (%s): el registro automático requiere confirmación vehicular", e)
         modelo = _modelo
     if modelo is None:
         return None

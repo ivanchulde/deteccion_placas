@@ -146,7 +146,7 @@ def crear_app(gestor: GestorCamaras) -> FastAPI:
             while motor.activo:
                 datos = motor.pistas_actuales()
                 ahora = time.monotonic()
-                visible = bool(datos.get("pistas") or datos.get("movimiento"))
+                visible = bool(datos.get("pistas") or datos.get("vehiculos") or datos.get("movimiento"))
                 if datos != ultimo or (visible and ahora - enviado >= 0.2):
                     await websocket.send_json(datos)
                     ultimo = datos

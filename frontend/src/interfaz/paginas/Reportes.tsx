@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CarFront, Download, FileText, Printer, UserRound } from 'lucide-react';
+import { ArrowLeft, CarFront, Download, FileText, Printer, UserRound } from 'lucide-react';
 import api, { mensajeError, mensajeErrorDescarga } from '../../infraestructura/api';
 import { useAuth } from '../../aplicacion/AuthContext';
 import { useConsulta } from '../../aplicacion/hooks';
@@ -19,10 +19,14 @@ import { type ResultadoBusqueda } from '../componentes/SituacionPlaca';
 import { useNotificar } from '../componentes/Notificaciones';
 import { PeriodoCompacto } from '../componentes/PeriodoCompacto';
 import { ReportesRegistros } from '../componentes/ReportesRegistros';
+import { CatalogoReportes, tarjetaDe, type TarjetaReporte } from '../componentes/CatalogoReportes';
+import { ReporteCatalogo } from '../componentes/ReporteCatalogo';
 import './Reportes.css';
 
 /**
- * Reportes para consultar e imprimir:
+ * Reportes. La portada son tres tarjetas (CatalogoReportes): vehículos que más ingresan, estado del
+ * sistema y auditoría, que se abren con ?reporte=… (ReporteCatalogo). Los informes anteriores
+ * (?vista=…) ya no están en el menú; siguen respondiendo a su enlace hasta decidir si se eliminan.
  *   - Accesos por fecha: los ingresos de un período con sus hallazgos, gráficos y los vehículos y
  *     personas más frecuentes.
  *   - Reporte de un vehículo: su situación en las listas, cuándo suele ingresar (semana, día, hora),
@@ -415,10 +419,19 @@ const HojaControl: React.FC = () => {
   );
 };
 
+/** Parámetros de un reporte que pueden llegar en el enlace (p. ej. desde el historial: ?buscar=PLACA). */
+const PARAMETROS_URL = ['buscar', 'situacion', 'camara', 'minimo', 'usuario', 'desde', 'hasta'];
+
 const Reportes: React.FC = () => {
   const [params, setParams] = useSearchParams();
-  // Los enlaces anteriores del historial (?vista=vehiculo/persona) abren ahora la lista ya filtrada.
-  const vista: Vista = (VISTAS as readonly string[]).includes(params.get('vista') ?? '') ? params.get('vista') as Vista : 'registros';
+  const vistaUrl = params.get('vista');
+  // Enlaces anteriores del historial (?vista=vehiculo&placa=… / ?vista=persona&persona=…): el ranking filtrado
+  const legado = vistaUrl === 'vehiculo' || vistaUrl === 'persona' ? (params.get('placa') || params.get('persona') || '').trim() : '';
+  const tipoReporte = legado ? 'vehiculos-frecuentes' : params.get('reporte');
+  const vista: Vista | 'catalogo' | 'reporte' = tipoReporte && tarjetaDe(tipoReporte) ? 'reporte'
+    : vistaUrl && (VISTAS as readonly string[]).includes(vistaUrl) ? vistaUrl as Vista : 'catalogo';
+  const inicial = legado ? { buscar: legado }
+    : Object.fromEntries(PARAMETROS_URL.flatMap(k => (params.get(k) ? [[k, params.get(k)!]] : []))) as Record<string, string>;
   const consulta = (clave: 'placa' | 'persona'): Consulta | null => {
     const valor = clave === 'placa' ? normalizarPlaca(params.get('placa')) : (params.get('persona') ?? '').trim();
     return valor ? { valor, desde: params.get('desde') ?? '', hasta: params.get('hasta') ?? '' } : null;
@@ -427,6 +440,7 @@ const Reportes: React.FC = () => {
     setParams(Object.fromEntries(Object.entries(cambios).filter(([, v]) => v)));
     window.scrollTo?.({ top: 0 });
   };
+  const abrir = (t: TarjetaReporte) => ir({ reporte: t.id });
   const verVehiculo = (placa: string) => ir({ vista: 'analisis_vehiculo', placa });
   const verPersona = (persona: string) => ir({ vista: 'analisis_persona', persona });
   return (
@@ -434,31 +448,27 @@ const Reportes: React.FC = () => {
       <div className="encabezado-pagina no-imprimir">
         <div>
           <h2>Reportes</h2>
-          <p>Filtre los registros y genere un reporte solo con esa lista.</p>
+          <p>{vista === 'catalogo'
+            ? 'Elija un reporte: se genera al abrirlo, con su análisis, gráficos y tablas, para imprimir, guardar en PDF o descargar en Excel.'
+            : 'Ajuste los datos si lo necesita, revise la vista previa e imprímala o descárguela.'}</p>
         </div>
       </div>
-      <div className="pila">
-        <div className="campo reportes-vista no-imprimir">
-          <label htmlFor="reportes-vista">Vista de reportes</label>
-          <select id="reportes-vista" className="select" value={vista} onChange={e => ir({ vista: e.target.value })}>
-            <option value="registros">Registros y filtros</option>
-            <optgroup label="Análisis e informes adicionales">
-              <option value="accesos">Análisis de accesos por período</option>
-              <option value="analisis_vehiculo">Análisis de un vehículo</option>
-              <option value="analisis_persona">Análisis de una persona</option>
-              <option value="control">Hoja de control de garita</option>
-            </optgroup>
-          </select>
+      {vista === 'catalogo' ? <CatalogoReportes onAbrir={abrir} /> : (
+        <div className="pila">
+          <div className="reportes-navegacion no-imprimir">
+            <button type="button" className="btn btn-ghost" onClick={() => ir({})}><ArrowLeft size={15} /> Todos los reportes</button>
+          </div>
+          {vista === 'registros' && <ReportesRegistros />}
+          {vista !== 'registros' && vista !== 'reporte' && <div className="reporte-paso no-imprimir"><strong>{vista === 'control' ? 'Elija el período, turno y formato' : 'Complete los datos y pulse «Generar reporte»'}</strong></div>}
+          {vista === 'accesos' && <ReporteAccesos onVehiculo={verVehiculo} onPersona={verPersona} />}
+          {vista === 'analisis_vehiculo' && <ReporteVehiculo consulta={consulta('placa')} onPersona={verPersona}
+            onConsultar={c => ir({ vista: 'analisis_vehiculo', placa: c.valor, desde: c.desde, hasta: c.hasta })} />}
+          {vista === 'analisis_persona' && <ReportePersona consulta={consulta('persona')} onVehiculo={verVehiculo}
+            onConsultar={c => ir({ vista: 'analisis_persona', persona: c.valor, desde: c.desde, hasta: c.hasta })} />}
+          {vista === 'control' && <HojaControl />}
+          {vista === 'reporte' && tipoReporte && <ReporteCatalogo key={tipoReporte} tipo={tipoReporte} inicial={inicial} />}
         </div>
-        {vista === 'registros' && <ReportesRegistros />}
-        {vista !== 'registros' && <div className="reporte-paso no-imprimir"><strong>{vista === 'control' ? 'Elija el período, turno y formato' : 'Complete los datos y pulse «Generar reporte»'}</strong></div>}
-        {vista === 'accesos' && <ReporteAccesos onVehiculo={verVehiculo} onPersona={verPersona} />}
-        {vista === 'analisis_vehiculo' && <ReporteVehiculo consulta={consulta('placa')} onPersona={verPersona}
-          onConsultar={c => ir({ vista: 'analisis_vehiculo', placa: c.valor, desde: c.desde, hasta: c.hasta })} />}
-        {vista === 'analisis_persona' && <ReportePersona consulta={consulta('persona')} onVehiculo={verVehiculo}
-          onConsultar={c => ir({ vista: 'analisis_persona', persona: c.valor, desde: c.desde, hasta: c.hasta })} />}
-        {vista === 'control' && <HojaControl />}
-      </div>
+      )}
     </div>
   );
 };

@@ -286,7 +286,7 @@ def formato_coherente_con_la_placa(plate_text: str, es_moto: bool, aspecto: Opti
     Una placa de auto (recuadro alargado, una fila) se lee con formato de auto (3 letras + 3 o 4
     dígitos) o diplomático; las de moto son casi cuadradas, de dos filas. Una lectura con formato de
     moto dentro de un recuadro de auto es texto que no es una placa (teclado, pantalla, rótulo) o una
-    placa de auto mal leída a la que le falta un carácter (PJF001 → PJ001). Con el `aspecto` del
+    placa de auto mal leída a la que le falta un carácter (PZX001 → PZ001). Con el `aspecto` del
     recuadro (ancho / alto), tampoco lo es una lectura con formato de auto en un recuadro casi
     cuadrado (ver ASPECTO_MIN_PLACA_AUTO).
     """

@@ -3,6 +3,7 @@ import { tipificarPlaca } from '../../dominio/tipificacion';
 
 /**
  * HUD de detección sobre el video, al estilo Rekor Scout / OpenALPR:
+ *  - recuadro del detector de vehículos, incluso sin lectura de placa;
  *  - zona de movimiento MOG2 (verde translúcido) cuando el motor confirma un vehículo en ella;
  *  - región de interés (fuera de ella, oscurecido) y zonas de exclusión (rojo translúcido): ahí el
  *    motor no cuenta el movimiento ni busca placas;
@@ -42,6 +43,7 @@ export interface PistaHud {
 }
 
 export interface MovimientoHud { caja: Caja; porcentaje: number }
+export interface VehiculoHud { caja: Caja; tipo: string }
 
 /** Rectángulo de la imagen dentro del elemento (object-fit: contain), en píxeles CSS. */
 export interface AreaDibujo { ancho: number; alto: number; x: number; y: number; w: number; h: number }
@@ -84,7 +86,7 @@ const FUENTE_PLACA = '600 12px ui-monospace, "Cascadia Mono", "SF Mono", Consola
 const FUENTE_DETALLE = '500 11px Inter, system-ui, sans-serif';
 
 const DESVANECER_PISTA_MS = 300;
-const VIDA_MOVIMIENTO_MS = 600;
+const VIDA_DETECCION_MS = 600;
 const ANTICIPACION_MAX_S = 0.25;
 // El video del navegador va detrás del motor (búfer de reproducción y red): la caja se lleva hacia
 // atrás con su velocidad hasta el cuadro que se está mostrando, como máximo este tiempo
@@ -156,7 +158,7 @@ function dibujarMovimiento(ctx: CanvasRenderingContext2D, a: AreaDibujo, m: Movi
   const w = Math.max(12, (m.caja[2] - m.caja[0]) * a.w);
   const h = Math.max(12, (m.caja[3] - m.caja[1]) * a.h);
   ctx.save();
-  ctx.globalAlpha = Math.max(0, 1 - edadMs / VIDA_MOVIMIENTO_MS) * 0.7;
+  ctx.globalAlpha = Math.max(0, 1 - edadMs / VIDA_DETECCION_MS) * 0.7;
   ctx.fillStyle = 'rgba(34, 197, 94, 0.10)';
   ctx.fillRect(x1, y1, w, h);
   ctx.strokeStyle = 'rgba(74, 222, 128, 0.65)';
@@ -164,13 +166,41 @@ function dibujarMovimiento(ctx: CanvasRenderingContext2D, a: AreaDibujo, m: Movi
   ctx.setLineDash([5, 5]);
   ctx.strokeRect(x1, y1, w, h);
   ctx.setLineDash([]);
-  const texto = `VEHÍCULO • MOV ${m.porcentaje}%`;
+  const texto = `MOVIMIENTO ${m.porcentaje}%`;
   ctx.font = 'bold 10px Inter, system-ui, monospace';
-  const by = Math.max(a.y + 4, y1 - 18);
+  const by = Math.max(a.y + 4, Math.min(a.y + a.h - 18, y1 + h + 2));
   ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
   ctx.fillRect(x1, by, ctx.measureText(texto).width + 14, 16);
   ctx.fillStyle = '#4ade80';
   ctx.fillText(texto, x1 + 7, by + 11.5);
+  ctx.restore();
+}
+
+function dibujarVehiculo(ctx: CanvasRenderingContext2D, a: AreaDibujo, vehiculo: VehiculoHud) {
+  const [x1, y1, x2, y2] = vehiculo.caja;
+  const [x, y] = aPantalla(a, x1, y1);
+  const w = (x2 - x1) * a.w;
+  const h = (y2 - y1) * a.h;
+  const etiqueta = vehiculo.tipo ? vehiculo.tipo[0].toUpperCase() + vehiculo.tipo.slice(1) : 'Vehículo';
+  const color = '#f87171';
+  ctx.save();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = CONTORNO;
+  ctx.strokeRect(x, y, w, h);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = color;
+  ctx.strokeRect(x, y, w, h);
+  ctx.font = FUENTE_DETALLE;
+  const ancho = ctx.measureText(etiqueta).width + 12;
+  const ex = Math.max(a.x, Math.min(x, a.x + a.w - ancho));
+  const ey = Math.max(a.y, y - 18);
+  ctx.fillStyle = FONDO_ETIQUETA;
+  ctx.fillRect(ex, ey, ancho, 18);
+  ctx.fillStyle = color;
+  ctx.fillRect(ex, ey, 2, 18);
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillText(etiqueta, ex + 6, ey + 9);
   ctx.restore();
 }
 
@@ -260,8 +290,8 @@ export function anticipoCaja(edad: number, desdeRecibida: number, retardoVideo: 
 }
 
 export interface Hud {
-  /** Pistas y zona de movimiento del último envío del motor (y la región de interés y las zonas de exclusión, si se conocen). */
-  actualizar: (pistas: PistaHud[], movimiento: MovimientoHud | null, roi?: Punto[] | null, exclusiones?: Punto[][]) => void;
+  /** Detecciones y zonas del último envío del motor. */
+  actualizar: (pistas: PistaHud[], movimiento: MovimientoHud | null, roi?: Punto[] | null, exclusiones?: Punto[][], vehiculos?: VehiculoHud[]) => void;
   /** Retardo del video del navegador respecto del motor (segundos, de las estadísticas WebRTC) */
   fijarRetardoVideo: (segundos: number | null) => void;
   limpiar: () => void;
@@ -271,6 +301,8 @@ export interface Hud {
 export function crearHud(lienzo: HTMLCanvasElement, area: () => AreaDibujo | null): Hud {
   const pistas = new Map<number, { p: PistaHud; recibida: number; opacidad: number }>();
   let movimiento: { m: MovimientoHud; recibido: number } | null = null;
+  let vehiculos: VehiculoHud[] = [];
+  let vehiculosRecibidos = 0;
   let roi: Punto[] | null = null;
   let exclusiones: Punto[][] = [];
   let retardoVideo = 0;
@@ -286,7 +318,7 @@ export function crearHud(lienzo: HTMLCanvasElement, area: () => AreaDibujo | nul
     previo = ahora;
     const a = area();
     const claveArea = a ? `${a.ancho}x${a.alto}:${a.x},${a.y},${a.w},${a.h}` : '';
-    if (!pendiente && pistas.size === 0 && !movimiento && claveArea === ultimaArea) return;
+    if (!pendiente && pistas.size === 0 && !movimiento && !vehiculos.length && claveArea === ultimaArea) return;
     pendiente = false;
     ultimaArea = claveArea;
 
@@ -305,9 +337,11 @@ export function crearHud(lienzo: HTMLCanvasElement, area: () => AreaDibujo | nul
     if (exclusiones.length) dibujarExclusiones(ctx, a, exclusiones);
     if (movimiento) {
       const edad = ahora - movimiento.recibido;
-      if (edad >= VIDA_MOVIMIENTO_MS) movimiento = null;
+      if (edad >= VIDA_DETECCION_MS) movimiento = null;
       else dibujarMovimiento(ctx, a, movimiento.m, edad);
     }
+    if (ahora - vehiculosRecibidos >= VIDA_DETECCION_MS) vehiculos = [];
+    for (const vehiculo of vehiculos) dibujarVehiculo(ctx, a, vehiculo);
     for (const [id, t] of pistas) {
       if (ahora - t.recibida > DESVANECER_PISTA_MS) {
         t.opacidad -= dt * 5;
@@ -320,10 +354,12 @@ export function crearHud(lienzo: HTMLCanvasElement, area: () => AreaDibujo | nul
   raf = requestAnimationFrame(cuadro);
 
   return {
-    actualizar(nuevas, mov, nuevoRoi, nuevasExclusiones) {
+    actualizar(nuevas, mov, nuevoRoi, nuevasExclusiones, nuevosVehiculos = []) {
       const ahora = performance.now();
       for (const p of nuevas) pistas.set(p.id, { p, recibida: ahora, opacidad: 1 });
       if (mov) movimiento = { m: mov, recibido: ahora };
+      vehiculos = nuevosVehiculos;
+      vehiculosRecibidos = ahora;
       if (nuevoRoi !== undefined) roi = nuevoRoi;
       if (nuevasExclusiones !== undefined) exclusiones = nuevasExclusiones;
       pendiente = true;
@@ -334,6 +370,7 @@ export function crearHud(lienzo: HTMLCanvasElement, area: () => AreaDibujo | nul
     limpiar() {
       pistas.clear();
       movimiento = null;
+      vehiculos = [];
       roi = null;
       exclusiones = [];
       pendiente = true;

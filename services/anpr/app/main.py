@@ -136,8 +136,9 @@ modelos_cargados: dict = {"detector": None, "detector_arquitectura": None, "ocr_
 
 
 def precargar_modelos() -> None:
-    """Detector, OCR y verificador en memoria antes de la primera cámara: tarda decenas de segundos."""
+    """Detectores, OCR y verificador en memoria antes de la primera cámara."""
     detector = detector_compartido()
+    get_detector_vehiculos()
     ocr = ocr_compartido()
     verificador = get_verifier()
     modelos_cargados.update(

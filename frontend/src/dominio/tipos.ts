@@ -413,3 +413,56 @@ export interface PanelAccesos {
   reincidentes: { placa: string; intentos: number; ultimo: string }[];
   denegados_recientes: Deteccion[];
 }
+
+// ─── Catálogo de reportes (GET /reportes/catalogo) ───────────────────────────
+
+export type TipoColumnaReporte = 'texto' | 'numero' | 'porcentaje' | 'fecha_hora' | 'fecha' | 'duracion' | 'placa' | 'imagen';
+export interface ColumnaReporte { clave: string; titulo: string; tipo?: TipoColumnaReporte }
+export interface SeccionReporte { titulo: string; nota?: string; columnas: ColumnaReporte[]; filas: Record<string, unknown>[]; total: number }
+export type CategoriaReporte = 'operacion' | 'sistema' | 'auditoria';
+export type NivelHallazgo = 'alerta' | 'atencion' | 'info' | 'ok';
+/** Lo que el análisis destaca, con qué hacer (alerta y atención piden actuar). */
+export interface HallazgoReporte { nivel: NivelHallazgo; texto: string; recomendacion?: string }
+/** Gráfico de barras horizontales de una sola serie; `maximo` fija la escala (100 en porcentajes). */
+export interface GraficoReporte { titulo: string; unidad: string; maximo?: number; barras: { etiqueta: string; valor: number; detalle?: string }[] }
+
+/** Reporte generado: cifras, avisos y secciones con columnas tipadas (las fotos llegan con URL firmada). */
+export interface ReporteGenerado {
+  tipo: string;
+  categoria: CategoriaReporte;
+  titulo: string;
+  descripcion: string;
+  generado: string;
+  parametros: [string, string][];
+  resumen: [string, string][];
+  hallazgos: HallazgoReporte[];
+  graficos: GraficoReporte[];
+  avisos: string[];
+  secciones: SeccionReporte[];
+}
+
+export interface ParametroReporte {
+  clave: string;
+  etiqueta: string;
+  tipo: 'camara' | 'entero' | 'texto' | 'opcion';
+  omision?: number | string;
+  min?: number;
+  max?: number;
+  requerido?: boolean;
+  opciones?: { valor: string; etiqueta: string }[];
+  ayuda?: string;
+  unidad?: string;
+}
+
+export interface DefinicionReporte {
+  id: string;
+  categoria: CategoriaReporte;
+  titulo: string;
+  descripcion: string;
+  periodo: boolean;
+  diasOmision?: number;
+  diasMaximos?: number;
+  parametros: ParametroReporte[];
+}
+
+export interface CatalogoReportes { categorias: Record<CategoriaReporte, string>; reportes: DefinicionReporte[] }

@@ -17,6 +17,7 @@ import { alertasRouter, autorizadosRouter } from './interfaz/http/rutas/listas';
 import panelRoutes from './interfaz/http/rutas/panel';
 import monitoreoRoutes from './interfaz/http/rutas/monitoreo';
 import controlVehicularRoutes from './interfaz/http/rutas/controlVehicular';
+import reportesRoutes from './interfaz/http/rutas/reportes';
 import configuracionRoutes from './interfaz/http/rutas/configuracion';
 import auditoriaRoutes from './interfaz/http/rutas/auditoria';
 import mediosRoutes from './interfaz/http/rutas/medios';
@@ -39,6 +40,8 @@ export const MONTAJES: [string, express.Router][] = [
   ['/api/vehiculos-autorizados', autorizadosRouter],
   ['/api/panel', panelRoutes],
   ['/api/monitoreo', monitoreoRoutes],
+  // El catálogo antes que la hoja de control: esa aplica su autenticación a todo /api/reportes
+  ['/api/reportes', reportesRoutes],
   ['/api/reportes', controlVehicularRoutes],
   ['/api/configuracion', configuracionRoutes],
   ['/api/auditoria', auditoriaRoutes],

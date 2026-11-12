@@ -838,6 +838,34 @@ export const RUTAS: RutaDoc[] = [
     archivo: 'application/pdf',
     respuestas: { 400: 'Fecha, cámara, turno o formato inválidos' },
   },
+  {
+    metodo: 'get', ruta: '/api/reportes/catalogo', etiqueta: 'Reportes', acceso: 'reportes:ver',
+    resumen: 'Reportes disponibles (tarjetas de Reportes)',
+    descripcion: 'Vehículos que más ingresan, estado del sistema y auditoría, con sus parámetros: tipo, valor por omisión, '
+      + 'mínimo, máximo y opciones.',
+  },
+  {
+    metodo: 'get', ruta: '/api/reportes/catalogo/:tipo([a-z-]+)', etiqueta: 'Reportes', acceso: 'reportes:ver',
+    resumen: 'Genera un reporte del catálogo',
+    descripcion: 'Devuelve el reporte como datos: parámetros aplicados, cifras de resumen, hallazgos con recomendación, gráficos de '
+      + 'barras horizontales, avisos y secciones con columnas tipadas '
+      + '(texto, número, porcentaje, fecha y hora, duración en minutos, placa o imagen) y hasta 2000 filas por sección. Las fotos '
+      + 'llegan con enlace firmado. Sin fechas, cada reporte usa su período por omisión.',
+    consulta: {
+      desde: { tipo: 'string', formato: 'date-time', ejemplo: '2026-11-01T05:00:00.000Z' },
+      hasta: { tipo: 'string', formato: 'date-time', ejemplo: '2026-11-12T04:59:59.999Z' },
+      camara: { tipo: 'integer', descripcion: 'ID de la cámara (vehículos que más ingresan)', ejemplo: 1 },
+    },
+    respuestas: { 400: 'Parámetro inválido o período demasiado largo', 404: 'El reporte no existe' },
+  },
+  {
+    metodo: 'get', ruta: '/api/reportes/catalogo/:tipo([a-z-]+)/excel', etiqueta: 'Reportes', acceso: 'reportes:ver',
+    resumen: 'Exporta un reporte del catálogo a Excel',
+    descripcion: 'Mismo reporte en un libro de Excel: hoja de resumen con el logo y una hoja por sección (hasta 20 000 filas, sin las fotos). '
+      + 'Lleva también los hallazgos y los datos de los gráficos. La descarga queda en la auditoría (REPORTE_EXPORTADO).',
+    archivo: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    respuestas: { 400: 'Parámetro inválido', 404: 'El reporte no existe' },
+  },
 
   // ─── Configuración ──────────────────────────────────────────────────────────
   {

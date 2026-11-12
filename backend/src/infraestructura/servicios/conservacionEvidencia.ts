@@ -58,6 +58,17 @@ function bytesLibres(directorio: string): number | null {
   }
 }
 
+/** Espacio que ocupan las fotos de evidencia y el libre en su disco (reporte de disponibilidad). */
+export function usoEvidencia(directorio: string = directorioFotos()): { bytes: number | null; libres: number | null; maximo: number } {
+  const maximo = config.entero('evidencia_disco_maximo_gb') * BYTES_GB;
+  if (!directorio) return { bytes: null, libres: null, maximo };
+  try {
+    return { bytes: fotosDe(directorio).reduce((suma, f) => suma + f.bytes, 0), libres: bytesLibres(directorio), maximo };
+  } catch {
+    return { bytes: null, libres: bytesLibres(directorio), maximo };
+  }
+}
+
 /** Los pasos más antiguos del lote que alcanzan para liberar estos bytes. */
 function lasNecesarias(lote: FilaFotos[], directorio: string, bytes: number): FilaFotos[] {
   let liberados = 0;

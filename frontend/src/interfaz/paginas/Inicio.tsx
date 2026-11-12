@@ -218,7 +218,7 @@ const PanelOperador: React.FC = () => {
         </section>
         <section className="guardia-celda guardia-dentro" aria-label="Vehículos dentro">
           <span>Vehículos dentro</span><strong>{cargando && !r ? '…' : numero(r?.movimientos?.dentro)}</strong>
-          <small>Ingresos autorizados que todavía no registran salida.</small>
+          <small>Vehículos que entraron y todavía no registran salida: cada entrada suma uno y cada salida resta uno.</small>
           <div className="fila guardia-enlaces">
             <Link to="/detecciones" className="btn btn-secondary btn-sm"><LogOut size={14} /> Registro de Salidas: {cargando && !r ? '…' : numero(r?.movimientos?.registros_completos)}</Link>
             <Link to="/historial" className="btn btn-secondary btn-sm"><History size={14} /> Historial completo</Link>

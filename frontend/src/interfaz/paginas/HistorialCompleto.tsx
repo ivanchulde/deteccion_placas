@@ -102,11 +102,11 @@ const PanelRegistro: React.FC<{
         {onEditar && <button type="button" className="btn btn-secondary" onClick={onEditar}><Edit3 size={15} /> Editar registro</button>}
         {onEliminar && <button type="button" className="btn btn-danger" onClick={onEliminar}><Trash2 size={15} /> Eliminar registro</button>}
         {puedeReportes && placa && (
-          <button type="button" className="btn btn-navy" onClick={() => navigate(`/reportes?vista=vehiculo&placa=${encodeURIComponent(placa)}`)}>
+          <button type="button" className="btn btn-navy" onClick={() => navigate(`/reportes?reporte=vehiculos-frecuentes&buscar=${encodeURIComponent(placa)}`)}>
             <BarChart3 size={15} /> Reporte del vehículo</button>
         )}
         {puedeReportes && nombre && (
-          <button type="button" className="btn btn-secondary" onClick={() => navigate(`/reportes?vista=persona&persona=${encodeURIComponent(nombre)}`)}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(`/reportes?reporte=vehiculos-frecuentes&buscar=${encodeURIComponent(nombre)}`)}>
             <UserRound size={15} /> Reporte de la persona</button>
         )}
         {placa && <button type="button" className="btn btn-secondary" onClick={() => onSoloPlaca(placa)}><ListFilter size={15} /> Ver todos sus pasos</button>}
@@ -377,11 +377,11 @@ const HistorialCompleto: React.FC = () => {
                 <button type="button" aria-label="Quitar la franja horaria" onClick={() => cambiar({ hora_desde: undefined, hora_hasta: undefined })}><X size={12} /></button></span>}
               {hayFiltros && <button type="button" className="btn btn-ghost btn-sm" onClick={limpiar}>Limpiar filtros</button>}
               {puedeReportes && placaReporte && (
-                <button type="button" className="btn btn-sm btn-secondary acceso-reporte" onClick={() => navigate(`/reportes?vista=vehiculo&placa=${placaReporte}`)}>
+                <button type="button" className="btn btn-sm btn-secondary acceso-reporte" onClick={() => navigate(`/reportes?reporte=vehiculos-frecuentes&buscar=${encodeURIComponent(placaReporte)}`)}>
                   <BarChart3 size={14} /> Reporte del vehículo {formatearPlaca(placaReporte)}</button>
               )}
               {puedeReportes && nombreReporte && (
-                <button type="button" className="btn btn-sm btn-secondary acceso-reporte" onClick={() => navigate(`/reportes?vista=persona&persona=${encodeURIComponent(nombreReporte)}`)}>
+                <button type="button" className="btn btn-sm btn-secondary acceso-reporte" onClick={() => navigate(`/reportes?reporte=vehiculos-frecuentes&buscar=${encodeURIComponent(nombreReporte)}`)}>
                   <UserRound size={14} /> Reporte de «{nombreReporte}»</button>
               )}
             </div>
@@ -412,17 +412,19 @@ const HistorialCompleto: React.FC = () => {
           <div className="tabla-contenedor" role="region" aria-label="Tabla del historial completo" tabIndex={0}>
             <table className="tabla tabla-historial">
               <thead><tr>
-                <th className="col-imagen">Imagen</th><th>Placa</th><th>Fecha y hora</th><th>Persona</th><th>Vehículo</th><th>Cámara</th>
+                <th className="col-imagen">Imagen</th><th>Placa</th><th>Fecha y hora</th><th>Nombres y apellidos</th><th>Cédula</th>
+                <th>Institución</th><th>Cargo</th><th>Motivo</th><th>Tipo</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Cámara</th>
                 <th>Confianza</th><th>Estado</th>{tieneAcciones && <th>Acciones</th>}
               </tr></thead>
               <tbody>
-                {cargando && !datos ? <FilasEsqueleto columnas={tieneAcciones ? 9 : 8} /> : datos?.items.map(d => {
+                {cargando && !datos ? <FilasEsqueleto columnas={tieneAcciones ? 16 : 15} /> : datos?.items.map(d => {
                   const horas = horasDelMovimiento(d);
                   const esElegida = elegida?.id === d.id;
                   const acceso = estadoAcceso(d);
                   const foto = urlMedia(d.imagen_vehiculo) ?? urlMedia(recortePlaca(d));
                   const nombre = persona(d);
-                  const marcaModelo = [d.vehiculo?.marca, d.vehiculo?.modelo].filter(Boolean).join(' ');
+                  const ficha = d.datos_permiso;
+                  const vacio = <span className="texto-secundario">—</span>;
                   return (
                     <tr key={d.id} className={`clic acento-${acceso}${esElegida ? ' fila-elegida' : ''}`} tabIndex={0} aria-selected={esElegida}
                       title="Ver la evidencia y los reportes (doble clic: abrir en monitoreo)"
@@ -446,12 +448,17 @@ const HistorialCompleto: React.FC = () => {
                           {horas.salida && <span className="salida"><ArrowUpRight size={12} aria-hidden="true" /> Salida {hora(horas.salida)}</span>}
                         </span>
                       </td>
-                      <td>{nombre ? <><span className="historial-principal">{nombre}</span>{d.datos_permiso?.cedula && <span className="historial-secundario">C.I. {d.datos_permiso.cedula}</span>}</>
-                        : <span className="texto-secundario">—</span>}</td>
-                      <td>{vehiculo(d) ? <><span className="historial-principal">{d.vehiculo?.tipo ?? d.tipo_vehiculo ?? 'Vehículo'}</span>
-                        {(marcaModelo || d.vehiculo?.color) && <span className="historial-secundario">{[marcaModelo, d.vehiculo?.color].filter(Boolean).join(' · ')}</span>}</>
-                        : <span className="texto-secundario">—</span>}</td>
-                      <td>{d.camara ? <><span className="historial-principal">{d.camara.nombre}</span><span className="historial-secundario">{d.camara.ubicacion}</span></>
+                      <td className="historial-col-nombre">{nombre ? <span className="historial-principal">{nombre}</span> : vacio}</td>
+                      <td className="nowrap">{ficha?.cedula || vacio}</td>
+                      <td className="historial-col-texto">{ficha?.institucion || vacio}</td>
+                      <td className="historial-col-texto">{ficha?.cargo || vacio}</td>
+                      <td className="historial-col-motivo">{d.motivo_ingreso || (d.alerta
+                        ? <span className="historial-motivo-alerta">Lista negra: {d.alerta.motivo}</span> : vacio)}</td>
+                      <td>{d.vehiculo?.tipo ?? d.tipo_vehiculo ?? vacio}</td>
+                      <td>{d.vehiculo?.marca || vacio}</td>
+                      <td>{d.vehiculo?.modelo || vacio}</td>
+                      <td>{d.vehiculo?.color || vacio}</td>
+                      <td className="historial-col-camara">{d.camara ? <><span className="historial-principal">{d.camara.nombre}</span><span className="historial-secundario">{d.camara.ubicacion}</span></>
                         : <span className="texto-secundario">{d.fuente === 'manual' ? 'Registro manual' : '—'}</span>}</td>
                       <td className="nowrap"><ConfianzaRegistro valor={d.confianza_ocr} /></td>
                       <td className="nowrap"><InsigniaEstado estado={d.estado_validacion} procesando={d.estado_procesamiento === 'pendiente_ocr'} corta /></td>

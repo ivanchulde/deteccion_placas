@@ -33,7 +33,7 @@ import time
 import threading
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Optional, List, Tuple
+from typing import Any, Optional, List, Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -51,6 +51,7 @@ from app.dominio.models import Detection
 from app.infraestructura.detectors import BaseDetector, create_detector
 from app.infraestructura.low_light import enhance_low_light
 from app.infraestructura.ocr_engine import create_ocr_engine
+from app.aplicacion.contexto_vehicular import MarcoVehicular
 from app.aplicacion.movimiento import CompuertaInferencia, DetectorMovimiento, Movimiento
 from app.dominio.latencia import Cronometros
 from app.aplicacion.verificacion_placa import (
@@ -718,12 +719,7 @@ class DetectionPipeline:
         return nuevo
 
     def get_motion_info(self, fuente: str = "rtsp") -> tuple[Optional[list[int]], int, bool]:
-        """
-        Retorna (motion_bbox, motion_pct, vehicle_detected) de la fuente (la cámara RTSP).
-        vehicle_detected=True SOLO si la zona de movimiento se superpone con una
-        detección YOLO válida (placa de vehículo), eliminando falsos positivos por
-        personas, sombras o cambios de iluminación.
-        """
+        """Zona MOG2, porcentaje y coincidencia con una pista de placa para el HUD local."""
         return self._zona_movimiento[fuente]
 
     def ultimo_movimiento(self) -> Optional[Movimiento]:
@@ -762,10 +758,14 @@ class DetectionPipeline:
         self.inferencias[fuente]["omitidas"] += 1
         return False
 
-    def _registrar_movimiento(self, fuente: str, mov: Movimiento, det_boxes: list[list[float]]) -> None:
-        """Zona de movimiento vigente: solo se activa si contiene una detección de placa."""
-        vehiculo = self._is_vehicle_motion(mov.caja, det_boxes)
-        self._zona_movimiento[fuente] = (mov.caja if vehiculo else None, mov.porcentaje, vehiculo)
+    def _registrar_movimiento(self, fuente: str, mov: Movimiento, pistas: list[TrackedPlateROI]) -> None:
+        # La placa suele ocupar una fracción pequeña de la zona que recorre el vehículo.
+        # Cuenta el movimiento dentro de la placa y no el área total de la zona MOG2.
+        coincide = mov.caja is not None and any(
+            not pista.predicha and mov.fraccion_en(pista.plate_bbox) >= _FRACCION_PISTA_EN_MOVIMIENTO
+            for pista in pistas
+        )
+        self._zona_movimiento[fuente] = (mov.caja if coincide else None, mov.porcentaje, coincide)
 
     def _marcar_si_se_mueve(self, fuente: str, tid: int, bbox: list[int], mov: Movimiento) -> bool:
         """True si el track se ha movido alguna vez (parte de su caja cambió en algún cuadro)."""
@@ -773,37 +773,6 @@ class DetectionPipeline:
         if tid not in movidas and mov.fraccion_en(bbox) >= _FRACCION_PISTA_EN_MOVIMIENTO:
             movidas.add(tid)
         return tid in movidas
-
-    @staticmethod
-    def _is_vehicle_motion(
-        motion_bbox: Optional[list[int]],
-        det_boxes: list[list[float]],
-        iou_threshold: float = 0.04,
-    ) -> bool:
-        """
-        Valida si la zona de movimiento MOG2 contiene al menos una detección YOLO
-        de placa/vehículo (IoU > iou_threshold). Umbral bajo (0.04) porque la placa
-        puede estar en el borde de la zona de movimiento cuando el vehículo entra
-        o sale del encuadre — no se requiere superposición total.
-        """
-        if not motion_bbox or not det_boxes:
-            return False
-        mx1, my1, mx2, my2 = motion_bbox
-        for box in det_boxes:
-            bx1, by1, bx2, by2 = box[0], box[1], box[2], box[3]
-            ix1 = max(mx1, bx1)
-            iy1 = max(my1, by1)
-            ix2 = min(mx2, bx2)
-            iy2 = min(my2, by2)
-            inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
-            if inter <= 0:
-                continue
-            area_motion = max(1.0, (mx2 - mx1) * (my2 - my1))
-            area_box = max(1.0, (bx2 - bx1) * (by2 - by1))
-            union = area_motion + area_box - inter
-            if union > 0 and (inter / union) >= iou_threshold:
-                return True
-        return False
 
     def update_track_plate(
         self,
@@ -960,10 +929,9 @@ class DetectionPipeline:
         self.tiempos.registrar("movimiento", time.perf_counter() - t0)
         if self._pasar_compuerta("rtsp", mov, self._trackers):
             self._actualizar_pistas(frame, mov)
-        else:
-            self._zona_movimiento["rtsp"] = (None, mov.porcentaje, False)
         t_pistas = time.perf_counter()
         tracked_rois = self._construir_pistas(frame, mov)
+        self._registrar_movimiento("rtsp", mov, tracked_rois)
         self.tiempos.registrar("pistas", time.perf_counter() - t_pistas)
         self._medir_fps(t0)
         return tracked_rois
@@ -1075,10 +1043,6 @@ class DetectionPipeline:
         except Exception as e:
             logger.error("Error en inferencia de matrículas: %s", e)
         self._inference_count += 1
-
-        # Validación inteligente de movimiento para stream RTSP: activar zona de movimiento
-        # SOLO cuando hay una detección YOLO de placa/vehículo en esa zona.
-        self._registrar_movimiento("rtsp", mov, det_high_boxes + det_low_boxes)
 
         # 3. Asociación ByteTrack FASE 1: Detecciones con DIoU (tolerante a movimiento rápido).
         # Umbral -0.25: ahora que compute_diou_matrix descarta por escala inconsistente
@@ -1328,6 +1292,7 @@ class DetectionPipeline:
         capture_fps: float = 0.0,
         inference_fps: float = 0.0,
         posiciones: Optional[dict[int, tuple[tuple[float, float, float, float], Optional[list[tuple[float, float]]]]]] = None,
+        marco_vehicular: Optional[MarcoVehicular] = None,
     ) -> np.ndarray:
         """
         Dibuja el HUD del modo de compatibilidad con el mismo estilo que el del navegador (hud.ts),
@@ -1339,16 +1304,21 @@ class DetectionPipeline:
 
         `posiciones`: caja y cuadrilátero de cada pista en este mismo cuadro (seguidor por flujo óptico).
         Sin ellas se dibuja la posición del último análisis, que entre análisis queda detrás de la placa.
+        Con `marco_vehicular` se dibujan el movimiento respaldado por vehículos y solo las placas confirmadas.
         """
         out_frame = frame.copy()
         h, w = out_frame.shape[:2]
 
-        # 0. Zona de Movimiento MOG2 translúcida — SOLO si hay un vehículo/placa
-        # detectado por YOLO en esa zona (vehicle_detected=True). Elimina el cuadro
-        # verde que aparecía con personas, sombras o cualquier movimiento que no sea un auto.
-        caja_mov, pct_mov, vehiculo_mov = self._zona_movimiento["rtsp"]
-        if caja_mov and pct_mov > 3 and vehiculo_mov:
-            mx1, my1, mx2, my2 = caja_mov
+        vigente = marco_vehicular if marco_vehicular and marco_vehicular.forma == (h, w) else None
+        movimiento: Optional[tuple[Sequence[float], int]]
+        if marco_vehicular is None:
+            caja_mog2, porcentaje, coincide = self._zona_movimiento["rtsp"]
+            movimiento = (caja_mog2, porcentaje) if caja_mog2 and porcentaje > 3 and coincide else None
+        else:
+            movimiento = vigente.movimiento if vigente else None
+        if movimiento is not None:
+            caja_mov, pct_mov = movimiento
+            mx1, my1, mx2, my2 = (int(round(v)) for v in caja_mov)
             overlay = out_frame.copy()
             cv2.rectangle(overlay, (mx1, my1), (mx2, my2), (40, 190, 70), -1)
             cv2.addWeighted(overlay, 0.18, out_frame, 0.82, 0, out_frame)
@@ -1356,7 +1326,7 @@ class DetectionPipeline:
             # Etiqueta táctica con el porcentaje de movimiento de la zona
             cv2.putText(
                 out_frame,
-                f"VEHICULO - MOV {pct_mov}%",
+                f"MOV {pct_mov}%",
                 (mx1 + 4, my1 + 14),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.40,
@@ -1383,12 +1353,25 @@ class DetectionPipeline:
         for zona in self._exclusiones_px(w, h):
             contorno_discontinuo(zona, (60, 60, 235))
 
-        with self._overlays_lock:
-            overlays = list(self._current_overlays)
-
         # Grosor y texto en proporción al cuadro: el modo de compatibilidad lo reduce a 640 px
         grosor = max(1, round(w / 1280))
         escala = 0.5 * w / 1280
+        if vigente:
+            color_vehiculo = (113, 113, 248)
+            escala_vehiculo = max(0.4, escala)
+            for _, _, caja in vigente.vehiculos:
+                x1, y1, x2, y2 = (int(round(v)) for v in caja)
+                cv2.rectangle(out_frame, (x1, y1), (x2, y2), (0, 0, 0), grosor + 2, cv2.LINE_AA)
+                cv2.rectangle(out_frame, (x1, y1), (x2, y2), color_vehiculo, grosor, cv2.LINE_AA)
+                etiqueta = (max(0, x1 + 4), max(47, y1 - 4))
+                cv2.putText(out_frame, "Vehiculo", etiqueta, cv2.FONT_HERSHEY_SIMPLEX,
+                            escala_vehiculo, (0, 0, 0), 2, cv2.LINE_AA)
+                cv2.putText(out_frame, "Vehiculo", etiqueta, cv2.FONT_HERSHEY_SIMPLEX,
+                            escala_vehiculo, color_vehiculo, 1, cv2.LINE_AA)
+
+        with self._overlays_lock:
+            overlays = [ov for ov in self._current_overlays
+                        if marco_vehicular is None or (vigente and ov.tracking_id in vigente.pistas)]
         for ov in overlays:
             x1, y1, x2, y2 = ov.x1, ov.y1, ov.x2, ov.y2
             cuadrilatero = ov.oriented_box

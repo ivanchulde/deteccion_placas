@@ -178,6 +178,9 @@ export async function probarConexion(rtspUrl: string, ip?: string | null, timeou
   return { ...base, en_linea: false, diagnostico: 'rechazado', tiempo_ms: tiempo, servidor, mensaje: `La cámara respondió RTSP ${r.codigo}` };
 }
 
+/** Cámaras cuyo historial de conexión ya tiene un punto de partida (en este proceso). */
+const camarasConHistorial = new Set<number>();
+
 /** Guarda el resultado y avisa en tiempo real solo si el estado cambió. */
 export async function registrarConexion(camaraId: number, r: ResultadoConexion, forzarAviso = false): Promise<void> {
   const db = getDB();
@@ -190,6 +193,20 @@ export async function registrarConexion(camaraId: number, r: ResultadoConexion, 
     .input('msg', sql.VarChar(255), r.mensaje.substring(0, 255))
     .query(`UPDATE Camaras SET estado = @estado, ultimo_ping = GETDATE(), tiempo_respuesta_ms = @ms, mensaje_ping = @msg WHERE id = @id`);
   const p = prev.recordset[0];
+  // Historial de conexión (reporte de disponibilidad): los cambios de estado y, la primera vez que
+  // se verifica una cámara sin historial, su estado de partida.
+  let cambio = Boolean(p && p.estado !== estado);
+  if (p && !cambio && !camarasConHistorial.has(camaraId)) {
+    const e = await db.request().input('id', sql.Int, camaraId).query('SELECT 1 FROM camaraseventos WHERE camara_id = @id LIMIT 1').catch(() => null);
+    cambio = Boolean(e && !e.recordset.length);
+  }
+  camarasConHistorial.add(camaraId);
+  if (cambio) {
+    await db.request().input('id', sql.Int, camaraId).input('estado', sql.VarChar(20), estado)
+      .input('msg', sql.VarChar(255), r.mensaje.substring(0, 255)).input('ms', sql.Int, r.tiempo_ms)
+      .query('INSERT INTO camaraseventos (camara_id, estado, mensaje, tiempo_respuesta_ms) VALUES (@id, @estado, @msg, @ms)')
+      .catch(e => console.warn(`[CAMARAS] No se guardó el cambio de conexión de la cámara #${camaraId}: ${(e as Error).message}`));
+  }
   if (forzarAviso || p?.estado !== estado || p?.mensaje_ping !== r.mensaje) {
     emitEvent('camara:estado', { id: camaraId, estado, tiempo_respuesta_ms: r.tiempo_ms, mensaje_ping: r.mensaje, ultimo_ping: new Date() });
   }
