@@ -20,7 +20,7 @@ export interface TarjetaReporte {
 export const TARJETAS: TarjetaReporte[] = [
   { id: 'vehiculos-frecuentes', titulo: 'Vehículos que más ingresan', icono: CarFront, color: 'azul',
     ayuda: 'Ranking completo de vehículos con su titular, datos del vehículo y fotos.',
-    incluye: ['Ranking con todos los datos y fotos', 'Marcas, tipos, colores e instituciones', 'Horas y días con más ingresos'] },
+    incluye: ['Ranking con todos los datos y fotos', 'Áreas, instituciones, marcas, tipos y colores', 'Horas y días con más ingresos'] },
   { id: 'estado-sistema', titulo: 'Estado del sistema', icono: ServerCog, color: 'teal',
     ayuda: 'Qué funciona, qué falla y qué hacer: cámaras, motor ANPR, base de datos, almacenamiento y operación.',
     incluye: ['Verificación de cada componente', 'Disponibilidad y lectura por cámara', 'Recomendaciones para cada falla'] },
@@ -31,8 +31,20 @@ export const TARJETAS: TarjetaReporte[] = [
 
 export const tarjetaDe = (id: string | null | undefined) => TARJETAS.find(t => t.id === id) ?? null;
 
-export const CatalogoReportes: React.FC<{ onAbrir: (t: TarjetaReporte) => void }> = ({ onAbrir }) => (
-  <ul className="reportes-tarjetas reportes-tarjetas-grandes">
+/** Cómo se hace un reporte, en tres pasos (encima de las tarjetas). */
+const PASOS: [string, string][] = [
+  ['Elija un reporte', 'Pulse una de las tarjetas de abajo: el reporte se arma al instante con los últimos días.'],
+  ['Ajuste las fechas o los filtros', 'Si lo necesita, cambie el período o filtre: el reporte se actualiza solo, sin botones.'],
+  ['Guárdelo o imprímalo', '«Descargar Excel» para trabajar los datos o «Imprimir o guardar PDF» para el documento.'],
+];
+
+export const CatalogoReportes: React.FC<{ onAbrir: (t: TarjetaReporte) => void }> = ({ onAbrir }) => (<>
+  <ol className="reportes-como" aria-label="Cómo se hace un reporte">
+    {PASOS.map(([titulo, texto], i) => (
+      <li key={titulo}><span className="reporte-numero" aria-hidden="true">{i + 1}</span><span><strong>{titulo}</strong>{texto}</span></li>
+    ))}
+  </ol>
+  <ul className="reportes-tarjetas reportes-tarjetas-grandes" aria-label="Reportes disponibles">
     {TARJETAS.map(t => {
       const Icono = t.icono;
       return (
@@ -46,4 +58,4 @@ export const CatalogoReportes: React.FC<{ onAbrir: (t: TarjetaReporte) => void }
       );
     })}
   </ul>
-);
+</>);

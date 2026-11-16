@@ -107,7 +107,7 @@ export async function excelReporte(r: Reporte, zona: string): Promise<Buffer> {
       hoja.getCell(fila, 1).font = { bold: true, size: 12 };
       fila++;
       const titulos = hoja.getRow(fila++);
-      titulos.values = ['', g.unidad === '%' ? 'Porcentaje' : nombrePropio(g.unidad), 'Detalle'];
+      titulos.values = [g.eje, g.unidad === '%' ? 'Porcentaje' : nombrePropio(g.unidad), 'Detalle'];
       titulos.eachCell(c => { c.font = { bold: true, size: 10 }; c.fill = FONDO_TITULO; c.border = BORDES; });
       for (const b of g.barras) {
         const row = hoja.getRow(fila++);

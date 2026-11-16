@@ -1,7 +1,7 @@
 import { errorNoEncontrado, errorValidacion, type Actor, type PuertoAuditoria } from './comun';
 import type { CalendarioLocal } from './calendario';
 import {
-  accionAuditada, CATALOGO, CATEGORIAS, CLASES_VEHICULO, claseVehiculo, DIAS_SEMANA, definicionReporte, disponibilidad, estadoGeneral,
+  accionAuditada, AREAS_SERVICIO, areaInstitucion, CATALOGO, CATEGORIAS, CLASES_VEHICULO, claseVehiculo, DIAS_SEMANA, definicionReporte, disponibilidad, estadoGeneral,
   franjaHora, hallazgosAuditoria, hallazgosVehiculos, leerParametros, nombrePropio, porcentaje, textoDuracion,
   verificacionesSistema, type CamaraSalud, type Columna, type Conteo, type DefinicionReporte, type EventoConexion, type Grafico,
   type Hallazgo, type IntentoSesion, type ParametrosLeidos, type Reporte, type Seccion,
@@ -136,7 +136,9 @@ export const LIMITE_VISTA = 2000;
 export const LIMITE_EXCEL = 20000;
 /** Nombre de las acciones sin usuario (las hace el sistema solo) */
 export const SISTEMA = 'Sistema (automático)';
+/** Barras del ranking de vehículos; las demás distribuciones muestran hasta BARRAS_DISTRIBUCION y suman el resto en «Otros». */
 const BARRAS = 10;
+const BARRAS_DISTRIBUCION = 25;
 
 const col = (clave: string, titulo: string, tipo?: Columna['tipo']): Columna => (tipo ? { clave, titulo, tipo } : { clave, titulo });
 
@@ -150,13 +152,28 @@ const numero = (n: number) => n.toLocaleString('es-EC');
 const pct = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('es-EC')} %`);
 const placaTexto = (p: string) => (/^[A-Z]{3}\d{3,4}$/.test(p) ? `${p.slice(0, 3)}-${p.slice(3)}` : /^[A-Z]{2}\d{3}[A-Z]$/.test(p) ? `${p.slice(0, 2)}-${p.slice(2)}` : p);
 
-/** Las `max` barras más largas (el resto se suma en «Otros» si lo hay). */
-export function grafico(titulo: string, unidad: string, datos: { etiqueta: string; valor: number; detalle?: string }[], max = BARRAS, otros = true): Grafico {
+/** Las `max` barras más largas, de mayor a menor (el resto se suma en «Otros» si lo hay). */
+export function grafico(titulo: string, eje: string, unidad: string, datos: { etiqueta: string; valor: number; detalle?: string }[],
+  max = BARRAS_DISTRIBUCION, otros = true): Grafico {
   const orden = [...datos].filter(x => x.valor > 0).sort((a, b) => b.valor - a.valor);
   const barras = orden.slice(0, max);
   const resto = orden.slice(max).reduce((s, x) => s + x.valor, 0);
   if (otros && resto > 0) barras.push({ etiqueta: `Otros (${orden.length - max})`, valor: resto });
-  return { titulo, unidad, barras };
+  return { titulo, eje, unidad, barras };
+}
+
+/** Ingresos por área de servicio (a partir de la institución), con las instituciones de cada área en el detalle. */
+function porArea(instituciones: Conteo[]): (Conteo & { instituciones: string[] })[] {
+  const m = new Map<string, Conteo & { instituciones: string[] }>();
+  for (const c of [...instituciones].sort((a, b) => b.ingresos - a.ingresos)) {
+    const area = areaInstitucion(c.valor);
+    const actual = m.get(area) ?? { valor: area, ingresos: 0, vehiculos: 0, instituciones: [] };
+    actual.ingresos += c.ingresos;
+    actual.vehiculos += c.vehiculos;
+    if (c.valor !== 'Sin dato') actual.instituciones.push(c.valor);
+    m.set(area, actual);
+  }
+  return [...m.values()].sort((a, b) => b.ingresos - a.ingresos || AREAS_SERVICIO.indexOf(a.valor as never) - AREAS_SERVICIO.indexOf(b.valor as never));
 }
 
 /** Conteos de una dimensión con el nombre legible («Sin dato» si falta); los tipos se agrupan por clase. */
@@ -194,7 +211,8 @@ export function casosReportes(d: DependenciasReportes) {
     const clases = conteos(r, 'tipo');
     const colores = conteos(r, 'color');
     const instituciones = conteos(r, 'institucion');
-    const horas = conteos(r, 'hora').filter(h => h.valor !== 'Sin dato').sort((a, b) => a.valor.localeCompare(b.valor));
+    const areas = porArea(instituciones);
+    const horas =conteos(r, 'hora').filter(h => h.valor !== 'Sin dato').sort((a, b) => a.valor.localeCompare(b.valor));
     const dias = conteos(r, 'dia').sort((a, b) => DIAS_SEMANA.indexOf(a.valor) - DIAS_SEMANA.indexOf(b.valor));
     const diasPeriodo = Math.max(1, Math.round((p.hasta!.getTime() - p.desde!.getTime()) / 86_400_000));
     // Marca, tipo y color con mayúscula inicial, como en los gráficos (los datos llegan escritos de varias formas)
@@ -209,23 +227,29 @@ export function casosReportes(d: DependenciasReportes) {
     };
     const top = r.filas[0];
     const marca = [...marcas].filter(m => m.valor !== 'Sin dato').sort((a, b) => b.ingresos - a.ingresos)[0];
-    const barras = (lista: Conteo[]) => lista.map(c => ({ etiqueta: c.valor, valor: c.ingresos, detalle: `${numero(c.vehiculos)} ${c.vehiculos === 1 ? 'vehículo' : 'vehículos'}` }));
+    const area = areas.find(a => a.valor !== 'Sin dato');
+    const vehiculosTexto = (n: number) => `${numero(n)} ${n === 1 ? 'vehículo' : 'vehículos'}`;
+    const barras = (lista: Conteo[]) => lista.map(c => ({ etiqueta: c.valor, valor: c.ingresos, detalle: vehiculosTexto(c.vehiculos) }));
+    const listaInstituciones = (a: { instituciones: string[] }) => (a.instituciones.length > 3 ? `${a.instituciones.slice(0, 3).join(', ')} y ${a.instituciones.length - 3} más` : a.instituciones.join(', '));
     return {
       parametros, avisos: [],
       resumen: [['Ingresos', numero(r.ingresos)], ['Vehículos distintos', numero(r.vehiculos)],
         ['Promedio por vehículo', r.vehiculos ? (r.ingresos / r.vehiculos).toLocaleString('es-EC', { maximumFractionDigits: 1 }) : '—'],
         ['Más frecuente', top ? `${placaTexto(top.placa)} (${numero(top.ingresos)})` : '—'],
-        ['Marca que más ingresa', marca ? `${marca.valor} (${numero(marca.ingresos)})` : '—']],
+        ['Marca que más ingresa', marca ? `${marca.valor} (${numero(marca.ingresos)})` : '—'],
+        ['Área que más ingresa', area ? `${area.valor} (${numero(area.ingresos)})` : '—']],
       hallazgos: hallazgosVehiculos({ filas: r.filas, ingresos: r.ingresos, vehiculos: r.vehiculos, unaVez: r.unaVez, marcas, clases, horas, dias, diasPeriodo }),
       graficos: [
-        grafico('Vehículos con más ingresos', 'ingresos', r.filas.slice(0, BARRAS).map(f => ({ etiqueta: `${placaTexto(f.placa)}${f.nombre ? ` · ${f.nombre}` : ''}`,
+        grafico('Vehículos con más ingresos', 'Vehículo', 'ingresos', r.filas.slice(0, BARRAS).map(f => ({ etiqueta: `${placaTexto(f.placa)}${f.nombre ? ` · ${f.nombre}` : ''}`,
           valor: f.ingresos, detalle: `${numero(f.dias)} ${f.dias === 1 ? 'día' : 'días'} con ingreso · ${f.situacion}` })), BARRAS, false),
-        grafico('Marcas que más ingresan', 'ingresos', barras(marcas)),
-        { titulo: 'Ingresos por tipo de vehículo', unidad: 'ingresos', barras: barras([...clases].sort((a, b) => ordenClase(a) - ordenClase(b))) },
-        grafico('Colores más frecuentes', 'ingresos', barras(colores)),
-        grafico('Instituciones que más ingresan', 'ingresos', barras(instituciones)),
-        { titulo: 'Ingresos por hora del día', unidad: 'ingresos', barras: barras(horas) },
-        { titulo: 'Ingresos por día de la semana', unidad: 'ingresos', barras: barras(dias) },
+        grafico('Ingresos por área', 'Área', 'ingresos', areas.map(a => ({ etiqueta: a.valor, valor: a.ingresos,
+          detalle: `${vehiculosTexto(a.vehiculos)}${a.instituciones.length ? ` · ${listaInstituciones(a)}` : ''}` }))),
+        grafico('Marcas que más ingresan', 'Marca', 'ingresos', barras(marcas)),
+        { titulo: 'Ingresos por tipo de vehículo', eje: 'Tipo de vehículo', unidad: 'ingresos', barras: barras([...clases].sort((a, b) => ordenClase(a) - ordenClase(b))) },
+        grafico('Colores más frecuentes', 'Color', 'ingresos', barras(colores)),
+        grafico('Instituciones que más ingresan', 'Institución', 'ingresos', barras(instituciones)),
+        { titulo: 'Ingresos por hora del día', eje: 'Hora del día', unidad: 'ingresos', barras: barras(horas) },
+        { titulo: 'Ingresos por día de la semana', eje: 'Día de la semana', unidad: 'ingresos', barras: barras(dias) },
       ].filter(g => g.barras.length),
       secciones: [
         { titulo: 'Ranking de vehículos', total: r.total, filas,
@@ -235,6 +259,11 @@ export function casosReportes(d: DependenciasReportes) {
             col('ingresos', 'Ingresos', 'numero'), col('participacion', '% de los ingresos', 'porcentaje'), col('dias', 'Días con ingreso', 'numero'),
             col('primero', 'Primer ingreso', 'fecha_hora'), col('ultimo', 'Último ingreso', 'fecha_hora'), col('permanencia', 'Permanencia promedio', 'duracion'),
             col('hora_texto', 'Hora habitual'), col('motivo_frecuente', 'Motivo más frecuente')] },
+        { titulo: 'Áreas', total: areas.length,
+          columnas: [col('valor', 'Área'), col('ingresos', 'Ingresos', 'numero'), col('participacion', '% de los ingresos', 'porcentaje'),
+            col('vehiculos', 'Vehículos distintos', 'numero'), col('instituciones', 'Instituciones que incluye')],
+          filas: areas.map(a => ({ ...a, participacion: porcentaje(a.ingresos, r.ingresos), instituciones: a.instituciones.join(', ') || null })),
+          nota:'El área se deduce de la institución registrada en el permiso o en el ingreso (p. ej. Policía Nacional → Seguridad ciudadana; MSP → Gestión sanitaria; Bomberos → Gestión de siniestros).' },
         tablaConteo('Marcas', 'Marca', marcas),
         tablaConteo('Instituciones', 'Institución', instituciones),
       ],
@@ -275,14 +304,14 @@ export function casosReportes(d: DependenciasReportes) {
     for (const x of lect.porDia) if (x.dia) pasosDia.set(x.dia, (pasosDia.get(x.dia) ?? 0) + x.pasos);
     const ESTADO: Record<string, string> = { ok: 'Correcto', atencion: 'Atención', falla: 'Falla' };
     const graficos: Grafico[] = [
-      { titulo: 'Disponibilidad por cámara', unidad: '%', maximo: 100,
+      { titulo: 'Disponibilidad por cámara', eje: 'Cámara', unidad: '%', maximo: 100, destacar: 'menor',
         barras: disponibles.map(x => ({ etiqueta: x.c.nombre, valor: x.disp.porcentaje!, detalle: `${x.disp.caidas} ${x.disp.caidas === 1 ? 'caída' : 'caídas'} · ${textoDuracion(x.disp.sinConexion / 60000)} sin conexión` })) },
-      { titulo: 'Tasa de lectura por cámara', unidad: '%', maximo: 100,
+      { titulo: 'Tasa de lectura por cámara', eje: 'Cámara', unidad: '%', maximo: 100, destacar: 'menor',
         barras: lect.porCamara.filter(x => x.pasos).map(x => ({ etiqueta: x.camara, valor: porcentaje(x.leidas, x.pasos)!, detalle: `${numero(x.leidas)} de ${numero(x.pasos)} vehículos` })) },
-      { titulo: 'Resultado de las lecturas', unidad: 'pasos', barras: [
+      { titulo: 'Resultado de las lecturas', eje: 'Resultado', unidad: 'vehículos', barras: [
         { etiqueta: 'Placa leída', valor: total.leidas }, { etiqueta: 'Sin placa visible', valor: total.sin },
         { etiqueta: 'Placa ilegible', valor: total.ilegibles }, { etiqueta: 'Corregida por el personal', valor: total.corregidas }].filter(b => b.valor > 0) },
-      { titulo: 'Vehículos detectados por día', unidad: 'pasos',
+      { titulo: 'Vehículos detectados por día', eje: 'Día', unidad: 'vehículos',
         barras: [...pasosDia.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, n]) => ({ etiqueta: diaCorto(dia), valor: n })) },
     ];
     return {
@@ -357,13 +386,13 @@ export function casosReportes(d: DependenciasReportes) {
     const columnasAccion = [col('fecha', 'Fecha y hora', 'fecha_hora'), col('usuario', 'Usuario'), col('rol', 'Rol'), col('accion', 'Acción'),
       col('categoria', 'Categoría'), col('detalle', 'Detalle'), col('ip', 'IP')];
     const graficos: Grafico[] = [
-      grafico('Acciones por usuario', 'acciones', listaUsuarios.map(u => ({ etiqueta: u.usuario, valor: u.total,
+      grafico('Acciones por usuario', 'Usuario', 'acciones', listaUsuarios.map(u => ({ etiqueta: u.usuario, valor: u.total,
         detalle: `${numero(u.sensibles)} sensibles · ${numero(u.fuera)} fuera de la jornada` }))),
-      grafico('Acciones más frecuentes', 'acciones', [...tipos.entries()].map(([etiqueta, valor]) => ({ etiqueta, valor }))),
-      grafico('Acciones por categoría', 'acciones', [...categorias.entries()].map(([etiqueta, valor]) => ({ etiqueta, valor })), 10, false),
-      grafico('Intentos fallidos de inicio de sesión', 'intentos', sesiones.filter(s => s.fallidos).map(s => ({ etiqueta: s.email, valor: s.fallidos,
+      grafico('Acciones más frecuentes', 'Acción', 'acciones', [...tipos.entries()].map(([etiqueta, valor]) => ({ etiqueta, valor }))),
+      grafico('Acciones por categoría', 'Categoría', 'acciones', [...categorias.entries()].map(([etiqueta, valor]) => ({ etiqueta, valor })), BARRAS_DISTRIBUCION, false),
+      grafico('Intentos fallidos de inicio de sesión', 'Cuenta (correo)', 'intentos', sesiones.filter(s => s.fallidos).map(s => ({ etiqueta: s.email, valor: s.fallidos,
         detalle: `${numero(s.ips)} ${s.ips === 1 ? 'IP distinta' : 'IP distintas'}` }))),
-      { titulo: 'Actividad por hora del día', unidad: 'acciones', barras: [...r.porHora].sort((a, b) => a.hora - b.hora).map(h => ({ etiqueta: franjaHora(h.hora), valor: h.n })) },
+      { titulo: 'Actividad por hora del día', eje: 'Hora del día', unidad: 'acciones', barras: [...r.porHora].sort((a, b) => a.hora - b.hora).map(h => ({ etiqueta: franjaHora(h.hora), valor: h.n })) },
     ];
     return {
       parametros, avisos: [],

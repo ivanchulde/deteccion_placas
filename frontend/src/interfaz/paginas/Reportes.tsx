@@ -449,8 +449,10 @@ const Reportes: React.FC = () => {
         <div>
           <h2>Reportes</h2>
           <p>{vista === 'catalogo'
-            ? 'Elija un reporte: se genera al abrirlo, con su análisis, gráficos y tablas, para imprimir, guardar en PDF o descargar en Excel.'
-            : 'Ajuste los datos si lo necesita, revise la vista previa e imprímala o descárguela.'}</p>
+            ? 'Cada reporte trae su análisis, gráficos y tablas, listo para imprimir, guardar en PDF o descargar en Excel.'
+            : vista === 'reporte'
+              ? 'El reporte ya está generado. Si cambia las fechas o los filtros, se actualiza solo; luego descárguelo o imprímalo.'
+              : 'Ajuste los datos si lo necesita, revise la vista previa e imprímala o descárguela.'}</p>
         </div>
       </div>
       {vista === 'catalogo' ? <CatalogoReportes onAbrir={abrir} /> : (

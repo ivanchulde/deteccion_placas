@@ -4,6 +4,9 @@ Control de acceso vehicular por reconocimiento automático de placas (ANPR). Est
 solo lo necesario para compilar y poner en marcha el sistema con Docker Compose en un servidor
 **Linux** o **Windows**. No incluye documentación de desarrollo, pruebas, datasets ni datos personales.
 
+> **¿Solo quiere ejecutarlo en su computadora** (probarlo o hacer una demostración en `localhost`)?
+> Siga la guía paso a paso [EJECUTAR_SISTEMA.md](EJECUTAR_SISTEMA.md).
+
 ## Contenido
 
 1. [Requisitos del sistema](#1-requisitos-del-sistema)
@@ -20,6 +23,7 @@ solo lo necesario para compilar y poner en marcha el sistema con Docker Compose 
 
 | Carpeta o archivo | Contenido |
 |---|---|
+| `EJECUTAR_SISTEMA.md` | Guía para ejecutarlo en una sola computadora (`localhost`) |
 | `docker-compose.prod.yml` | Los 5 servicios de producción |
 | `.env.example` | Plantilla de configuración, con todas las variables comentadas |
 | `backend/` | API REST y tiempo real (Node.js 24, TypeScript) |

@@ -423,8 +423,18 @@ export type CategoriaReporte = 'operacion' | 'sistema' | 'auditoria';
 export type NivelHallazgo = 'alerta' | 'atencion' | 'info' | 'ok';
 /** Lo que el análisis destaca, con qué hacer (alerta y atención piden actuar). */
 export interface HallazgoReporte { nivel: NivelHallazgo; texto: string; recomendacion?: string }
-/** Gráfico de barras horizontales de una sola serie; `maximo` fija la escala (100 en porcentajes). */
-export interface GraficoReporte { titulo: string; unidad: string; maximo?: number; barras: { etiqueta: string; valor: number; detalle?: string }[] }
+/**
+ * Gráfico de barras horizontales de una sola serie; `eje` nombra lo que es cada barra («Marca»),
+ * `maximo` fija la escala (100 en porcentajes) y `destacar` dice qué barra se resalta.
+ */
+export interface GraficoReporte {
+  titulo: string;
+  eje?: string;
+  unidad: string;
+  maximo?: number;
+  destacar?: 'mayor' | 'menor';
+  barras: { etiqueta: string; valor: number; detalle?: string }[];
+}
 
 /** Reporte generado: cifras, avisos y secciones con columnas tipadas (las fotos llegan con URL firmada). */
 export interface ReporteGenerado {

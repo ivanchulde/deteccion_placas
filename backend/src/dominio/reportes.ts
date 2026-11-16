@@ -64,12 +64,21 @@ export interface Seccion {
 export type NivelHallazgo = 'alerta' | 'atencion' | 'info' | 'ok';
 export interface Hallazgo { nivel: NivelHallazgo; texto: string; recomendacion?: string }
 
-/** Gráfico de barras horizontales (una sola serie): etiqueta, valor y un detalle para el tooltip. */
+/**
+ * Gráfico de barras horizontales (una sola serie): etiqueta, valor y un detalle para el tooltip.
+ * El navegador lo dibuja como el análisis de Excel: título con la conclusión, la barra que
+ * sobresale resaltada y el resto en gris, el valor en cada barra y el nombre de los dos ejes.
+ */
 export interface Grafico {
   titulo: string;
+  /** Qué es cada barra (eje vertical): «Marca», «Cámara», «Hora del día» */
+  eje: string;
+  /** Lo que se cuenta (eje horizontal: «Número de ingresos»); «%» en porcentajes */
   unidad: string;
   /** Escala fija (100 para porcentajes); sin ella, la barra más larga es el máximo */
   maximo?: number;
+  /** Barra que se resalta y se nombra en el título: la mayor (por omisión) o la menor (disponibilidad, lectura) */
+  destacar?: 'mayor' | 'menor';
   barras: { etiqueta: string; valor: number; detalle?: string }[];
 }
 
@@ -91,7 +100,7 @@ export const CATALOGO: readonly DefinicionReporte[] = [
   {
     id: 'vehiculos-frecuentes', categoria: 'operacion', titulo: 'Vehículos que más ingresan', periodo: true, diasOmision: 30,
     descripcion: 'Todos los vehículos que ingresaron, ordenados por cuántas veces lo hicieron, con su titular, datos del vehículo y fotos; '
-      + 'las marcas, tipos, colores, instituciones y horas que más ingresan, y lo que conviene revisar.',
+      + 'las áreas, instituciones, marcas, tipos, colores y horas que más ingresan, y lo que conviene revisar.',
     parametros: [
       { clave: 'camara', etiqueta: 'Cámara', tipo: 'camara' },
       { clave: 'situacion', etiqueta: 'Situación', tipo: 'opcion', omision: '', opciones: [
@@ -216,7 +225,35 @@ export function claseVehiculo(tipo: string | null | undefined): ClaseVehiculo {
   return 'Otro';
 }
 
-export const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+/**
+ * Área de servicio a la que pertenece la institución de quien ingresa: el personal del ECU 911 y
+ * los servicios que articula el sistema (seguridad ciudadana, tránsito y movilidad, gestión
+ * sanitaria, gestión de siniestros, gestión de riesgos, servicios municipales y servicios
+ * militares). La institución llega escrita a mano (MSP, BOMBEROS AMBATO, FF.AA…): se reconoce por
+ * palabras clave y, si no coincide con ninguna, cuenta como «Otras instituciones».
+ */
+export const AREAS_SERVICIO = ['Personal del ECU 911', 'Seguridad ciudadana', 'Tránsito y movilidad', 'Gestión sanitaria', 'Gestión de siniestros',
+  'Gestión de riesgos', 'Servicios municipales', 'Servicios militares', 'Otras instituciones', 'Sin dato'] as const;
+export type AreaServicio = typeof AREAS_SERVICIO[number];
+
+const REGLAS_AREA: [RegExp, AreaServicio][] = [
+  [/\bECU ?911\b|SERVICIO INTEGRADO DE SEGURIDAD/, 'Personal del ECU 911'],
+  [/SERVICIOS? MUNICIPAL|\bGAD|MUNICIPI|ALCALDIA|COMSECA/, 'Servicios municipales'],
+  [/POLICIA|\bUPC\b|DINASED/, 'Seguridad ciudadana'],
+  [/TRANSITO|MOVILIDAD|\bANT\b|\bCTE\b/, 'Tránsito y movilidad'],
+  [/BOMBER/, 'Gestión de siniestros'],
+  [/\bMSP\b|SALUD|\bIESS\b|CRUZ ROJA|HOSPITAL|AMBULANCIA/, 'Gestión sanitaria'],
+  [/RIESGO|\bSNGR\b|\bSGR\b/, 'Gestión de riesgos'],
+  [/FF\.? ?AA|FUERZAS ARMADAS|EJERCITO|MILITAR|\bARMADA\b|\bFAE\b|COMANDO CONJUNTO/, 'Servicios militares'],
+];
+
+export function areaInstitucion(institucion: string | null | undefined): AreaServicio {
+  const t = (institucion ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim().replace(/\s+/g, ' ');
+  if (!t || t === 'SIN DATO') return 'Sin dato';
+  return REGLAS_AREA.find(([regla]) => regla.test(t))?.[1] ?? 'Otras instituciones';
+}
+
+export const DIAS_SEMANA =['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 export const franjaHora = (h: number) => `${String(h).padStart(2, '0')}:00 – ${String(h).padStart(2, '0')}:59`;
 
 // ─── Vehículos que más ingresan ──────────────────────────────────────────────

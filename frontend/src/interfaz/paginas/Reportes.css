@@ -97,32 +97,97 @@
   .hallazgo { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }
 
-/* ─── Gráficos de barras horizontales (una serie, un tono; valor al final de la barra) ─── */
-.graficos-reporte { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px 32px; }
-.grafico-barras { margin: 0; min-width: 0; }
-.grafico-barras figcaption { margin-bottom: 8px; font-size: 12.5px; font-weight: 700; color: #0f172a; }
-.grafico-barras figcaption small { font-weight: 400; color: #64748b; }
-.grafico-barras ul { list-style: none; margin: 0; padding: 0; }
-.grafico-barras li {
-  position: relative; display: grid; grid-template-columns: minmax(90px, 38%) minmax(0, 1fr); align-items: center; gap: 10px;
-  padding: 3px 4px; border-radius: 4px; outline: none;
+/* ─── Gráficos de barras horizontales al estilo del análisis de Excel: título con la conclusión,
+   las barras que sobresalen en naranja y el resto en gris, valor en cada barra, rejilla, escala y
+   nombre de los dos ejes (ReporteCatalogo.tsx · GraficoBarras) ─── */
+.graficos-reporte { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap: 18px; }
+.grafico-barras {
+  --naranja: #e0701f; --gris: #c3c9d1; --rejilla: #e1e5ea; --eje: #a9b1bc; --etiquetas: minmax(96px, 34%);
+  margin: 0; min-width: 0; padding: 16px 18px 12px; border: 1px solid #d5dbe2; border-radius: 6px; background: #fff;
 }
-.grafico-barras li:hover, .grafico-barras li:focus-visible { background: #f1f5f9; }
-.grafico-etiqueta { font-size: 11.5px; color: #334155; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.grafico-pista { display: flex; align-items: center; gap: 6px; min-width: 0; border-left: 1px solid #cbd5e1; padding-left: 0; }
+.grafico-barras figcaption { margin: 0 0 12px; text-align: center; }
+.grafico-titulo { display: block; font-size: 15px; font-weight: 400; line-height: 1.35; color: #3f4650; }
+.grafico-titulo b { color: #b9560f; font-weight: 600; }
+.grafico-subtitulo { display: block; margin-top: 3px; font-size: 11.5px; color: #64748b; }
+.grafico-area { display: grid; grid-template-columns: minmax(18px, auto) minmax(0, 1fr); gap: 4px; }
+.grafico-area.sin-eje { grid-template-columns: minmax(0, 1fr); }
+.grafico-eje-y {
+  align-self: center; justify-self: center; writing-mode: vertical-rl; transform: rotate(180deg);
+  max-height: 100%; font-size: 12px; line-height: 1.15; text-align: center; color: #475569;
+}
+.grafico-cuerpo { min-width: 0; padding-right: 12px; }
+.grafico-filas { list-style: none; margin: 0; padding: 0; }
+.grafico-fila {
+  position: relative; display: grid; grid-template-columns: var(--etiquetas) minmax(0, 1fr); height: 23px; outline: none;
+}
+.grafico-fila:hover, .grafico-fila:focus-visible { background: #f4f6f9; }
+.grafico-fila:focus-visible { box-shadow: inset 0 0 0 2px #94a3b8; }
+.grafico-etiqueta {
+  align-self: center; padding-right: 8px; font-size: 11.5px; color: #334155; text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.grafico-pista { position: relative; min-width: 0; border-left: 1px solid var(--eje); }
+.grafico-rejilla { position: absolute; top: 0; bottom: 0; width: 1px; margin-left: -1px; background: var(--rejilla); }
 .grafico-barra {
-  display: block; height: 14px; min-width: 2px; flex-shrink: 1; background: #2a78d6; border-radius: 0 4px 4px 0;
+  position: absolute; left: 0; top: 4px; bottom: 4px; min-width: 2px; background: var(--gris); border-radius: 0 3px 3px 0;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
-.grafico-valor { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: #0f172a; font-variant-numeric: tabular-nums; }
-.grafico-barras li[data-detalle]:not([data-detalle=""]):hover::after,
-.grafico-barras li[data-detalle]:not([data-detalle=""]):focus-visible::after {
-  content: attr(data-detalle); position: absolute; right: 4px; bottom: calc(100% - 2px); z-index: 2; padding: 4px 8px; border-radius: 4px;
-  background: #0f172a; color: #fff; font-size: 11px; white-space: nowrap; pointer-events: none;
+.grafico-barra.destacada { background: var(--naranja); }
+.grafico-fila:hover .grafico-barra, .grafico-fila:focus-visible .grafico-barra { filter: brightness(.93); }
+.grafico-valor {
+  position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 600; color: #1f2937;
+  white-space: nowrap; font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.grafico-valor.fuera { transform: translateY(-50%); }
+.grafico-escala, .grafico-eje-x { display: grid; grid-template-columns: var(--etiquetas) minmax(0, 1fr); }
+.grafico-escala-marcas { position: relative; height: 20px; border-top: 1px solid var(--eje); }
+.grafico-escala-marcas > span {
+  position: absolute; top: 4px; transform: translateX(-50%); font-size: 11px; color: #475569; font-variant-numeric: tabular-nums;
+}
+.grafico-eje-x > span:last-child { padding-top: 4px; text-align: center; font-size: 12px; color: #475569; }
+.grafico-fila[data-detalle]:not([data-detalle=""]):hover::after,
+.grafico-fila[data-detalle]:not([data-detalle=""]):focus-visible::after {
+  content: attr(data-detalle); position: absolute; right: 0; bottom: calc(100% - 2px); z-index: 2; max-width: 90%; padding: 4px 8px; border-radius: 4px;
+  background: #0f172a; color: #fff; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
 }
 @media (max-width: 640px) {
   .graficos-reporte { grid-template-columns: minmax(0, 1fr); }
-  .grafico-barras li { grid-template-columns: minmax(80px, 42%) minmax(0, 1fr); }
+  .grafico-barras { --etiquetas: minmax(80px, 40%); padding: 12px 10px 10px; }
+  .grafico-titulo { font-size: 13.5px; }
+}
+
+/* ─── Datos del reporte en pasos: período, filtros y guardar o imprimir (se actualiza solo) ─── */
+.reporte-formulario { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 32px; }
+.reporte-grupo { min-width: 0; margin: 0; padding: 0; border: 0; }
+.reporte-grupo > legend, .reporte-grupo-titulo {
+  display: flex; align-items: center; gap: 7px; margin: 0 0 8px; padding: 0; font-size: 13px; font-weight: 700; color: var(--text);
+}
+.reporte-grupo > legend small { font-weight: 400; color: var(--text-3); }
+.reporte-numero {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%;
+  background: var(--navy-800); color: #fff; font-size: 12px; font-weight: 700;
+}
+.reporte-grupo-salida { margin-left: auto; }
+.reporte-grupo-salida .reporte-acciones { margin-left: 0; }
+.reporte-estado { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; font-size: 12.5px; color: var(--text-3); }
+.reporte-estado-ok { color: #1b5e20; }
+.reporte-girando { animation: reporte-giro 1s linear infinite; }
+@keyframes reporte-giro { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .reporte-girando { animation: none; } }
+@media (max-width: 640px) {
+  .reporte-grupo-salida { margin-left: 0; }
+}
+
+/* ─── Portada: cómo se hace un reporte ─── */
+.reportes-como { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.reportes-como li {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text); font-size: 13px; line-height: 1.4;
+}
+.reportes-como strong { display: block; margin-bottom: 2px; }
+.reportes-como span:last-child { color: var(--text-2, var(--text)); }
+@media (max-width: 760px) {
+  .reportes-como { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Vuelta a la portada de Reportes */
@@ -142,9 +207,13 @@
 
 @media print {
   .reporte-desactualizado { opacity: 1; }
-  .graficos-reporte { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+  .graficos-reporte { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
   .grafico-barras, .hallazgo { break-inside: avoid; }
-  .grafico-barras li[data-detalle]::after { display: none; }
+  .grafico-barras { padding: 10px 10px 8px; }
+  .grafico-titulo { font-size: 10.5pt; }
+  .grafico-fila { height: 17px; }
+  .grafico-etiqueta, .grafico-valor, .grafico-escala-marcas > span { font-size: 7.5pt; }
+  .grafico-fila[data-detalle]::after { display: none; }
   .informe-tabla-desplazable { overflow: visible; }
   .informe-tabla-compacta { font-size: 7.5pt; }
   .informe-tabla-compacta td, .informe-tabla-compacta th { padding: 3px 4px; }
