@@ -18,9 +18,13 @@ ENV YOLO_AUTOINSTALL=false \
 WORKDIR /app
 
 # Versiones exactas validadas (requirements.txt; las directas están en requirements.in). PyTorch
-# solo CPU: el despliegue no usa GPU (el índice va dentro de requirements.txt)
+# solo CPU: el despliegue no usa GPU (el índice va dentro de requirements.txt).
+# Red lenta: pip corta la descarga si pasan 15 s sin datos (la de torch pesa ~196 MB) y esta versión
+# (25.0) no reanuda; se amplía a 120 s y la caché de BuildKit conserva entre intentos las ruedas ya
+# bajadas (queda fuera de la imagen, no aumenta su tamaño)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --timeout 120 --retries 10 -r requirements.txt
 
 # Ultralytics sin conexiones en ejecución: ni telemetría de uso (activa por omisión al terminar cada
 # predicción), ni comprobación de versiones, ni descargas; los pesos van en la imagen (models/, *.pt)

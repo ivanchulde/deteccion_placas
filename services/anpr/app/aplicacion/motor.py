@@ -58,6 +58,7 @@ from app.aplicacion.verificacion_placa import (
     toca_borde_lateral,
 )
 from app.dominio.credenciales import sin_credenciales
+from app.dominio.eleccion_lectura import elegir_lectura, motivo_desacuerdo
 from app.dominio.ecuador_plate_validator import formato_coherente_con_la_placa, formato_placa, validate_ecuadorian_plate
 from app.dominio.interpretacion_placa import caracteres_sin_lectura_directa
 from app.dominio.memoria import purgar_expirados
@@ -207,6 +208,9 @@ class ConfigMotor:
     peso_voto_verificador: float
     # Registro del paso (docs/METODO_VERIFICACION_LECTURA.md §2.5). Los valores por omisión son los
     # de producción; scripts/evaluar_latencia.py los cambia para la ablación pareada.
+    #: Margen de confianza para que el verificador reemplace una lectura distinta del OCR rápido
+    #: (OCR_VERIFIER_OVERRIDE_MARGIN, app/dominio/eleccion_lectura.py)
+    margen_reemplazo_verificador: float = 0.10
     #: OCR profundo, verificador y vehículo en paralelo (False: uno tras otro)
     registro_paralelo: bool = True
     #: Análisis del vehículo iniciado al aparecer la placa completa (False: al registrar)
@@ -1618,8 +1622,8 @@ class MotorAnpr:
                    pendiente: _Pendiente, vehiculo: Optional[Future], hora_foto: Optional[float]) -> None:
         """
         Fase 3 · el registro rápido no esperó al verificador o al análisis del vehículo. Cuando
-        llegan, la lectura se recalcula con las mismas reglas que si hubieran llegado a tiempo (la
-        placa del verificador prevalece si lee una placa ANT) y el backend decide de nuevo: puede
+        llegan, la lectura se recalcula con las mismas reglas que si hubieran llegado a tiempo (si los
+        lectores discrepan, se aplica elegir_lectura y el paso queda para confirmación) y el backend decide de nuevo: puede
         confirmar el paso, rebajarlo por el segundo factor o pasarlo a alerta.
         """
         cuerpo: dict[str, Any] = {"ingreso_id": ingreso_id}
@@ -1642,10 +1646,18 @@ class MotorAnpr:
                         elif es_valida:
                             self._log.info("[VERIFICADOR] Track #%d | lectura tardía '%s' no corresponde a la forma de la placa: se conserva '%s'",
                                            tracking_id, formateada, placa)
-                    placa_final, conf_final = (placa_v, ver.confidence) if placa_v else (placa, conf)
+                    limpia_pv = placa_v.replace("-", "").upper()
+                    respaldo = bool(limpia_pv) and (limpia_pv == pendiente.contexto.get("limpia_profunda")
+                                                    or int(pendiente.contexto.get("conteo_previo", {}).get(limpia_pv, 0)) >= 1)
+                    eleccion = elegir_lectura(placa, conf, placa_v, ver.confidence if placa_v else 0.0,
+                                              self._config.margen_reemplazo_verificador, respaldo_verificador=respaldo)
+                    placa_final, conf_final = eleccion.placa, eleccion.confianza
                     limpia_v = placa_v.replace("-", "").upper()
                     validez, lecturas, coincide = self._validez(
                         placa=placa_final, limpia_verificador=limpia_v, crudo_verificador=crudo, **pendiente.contexto)
+                    if eleccion.desacuerdo:
+                        validez.motivos.append(motivo_desacuerdo(placa, placa_v))
+                        validez.valido = False
                     nueva = {k: v for k, v in evidencia.items() if k != "segundo_ocr_pendiente"}
                     nueva.update(validez.to_dict(), lectura_verificador=limpia_v or None, lectura_verificador_cruda=crudo or None)
                     cuerpo.update(placa_reconocida=placa_final, confianza_ocr=round(conf_final, 3), lectura_verificador=placa_v or None,
@@ -1948,17 +1960,27 @@ class MotorAnpr:
                 if es_valida:
                     placa, conf = formateada, conf_previa
 
-            # Placa final: la del verificador PP-OCRv6 cuando lee una placa ANT, porque es el lector
-            # más preciso (96 % frente a 90 % del OCR rápido en placas reales, models/MODEL_CARD.md);
-            # si no lee, la del OCR (consenso multi-cuadro, OCR profundo o lectura preliminar). Antes
-            # varios votos de un error sistemático del OCR rápido (Y→V) podían imponerse a él.
+            # Placa final (app/dominio/eleccion_lectura.py): si el OCR y el verificador PP-OCRv6
+            # coinciden o solo uno leyó, se usa esa lectura. Si discrepan, el verificador solo
+            # reemplaza al OCR cuando su confianza lo supera en el margen configurado, y el
+            # desacuerdo deja la lectura para confirmación del guardia. Antes el verificador
+            # reemplazaba siempre, pero en recortes reales el OCR rápido fue más exacto (87,5 %
+            # frente a 83,7 %) y en la garita esa regla cambió una lectura correcta (O→D).
             limpia_verificador = placa_verificador.replace("-", "").upper() if placa_verificador else ""
             limpia_profunda = (profundo.placa or "").replace("-", "").upper() if profundo else ""
+            desacuerdo_lectores = ""
             if placa_verificador:
-                if placa and placa.replace("-", "").upper() != limpia_verificador:
-                    self._log.info("[VERIFICADOR] Track #%d | el OCR leyó '%s'; se registra la lectura del verificador '%s'",
-                                   tracking_id, placa, placa_verificador)
-                placa, conf = placa_verificador, conf_verificador
+                ocr_coherente = bool(placa) and validate_ecuadorian_plate(placa)[0] and \
+                    formato_coherente_con_la_placa(placa, es_moto, aspecto)
+                respaldo = limpia_verificador == limpia_profunda or int(conteo_previo.get(limpia_verificador, 0)) >= 1
+                eleccion = elegir_lectura(placa, conf, placa_verificador, conf_verificador,
+                                          self._config.margen_reemplazo_verificador,
+                                          ocr_coherente=ocr_coherente, respaldo_verificador=respaldo)
+                if eleccion.desacuerdo:
+                    desacuerdo_lectores = motivo_desacuerdo(placa, placa_verificador)
+                    self._log.info("[VERIFICADOR] Track #%d | el OCR leyó '%s' (%.2f) y el verificador '%s' (%.2f); se registra '%s' para confirmación",
+                                   tracking_id, placa, conf, placa_verificador, conf_verificador, eleccion.placa)
+                placa, conf = eleccion.placa, eleccion.confianza
 
             # 3. Compuerta estricta: sin matrícula ANT válida se audita el descarte
             limpia = placa.replace("-", "").strip().upper() if placa else ""
@@ -2014,6 +2036,10 @@ class MotorAnpr:
             }
             validez, lecturas, verificador_coincide = self._validez(
                 placa=placa, limpia_verificador=limpia_verificador, crudo_verificador=crudo_verificador, **contexto)
+            if desacuerdo_lectores:
+                # Dos lectores con placas distintas: no se autoriza sin una persona (R3 del backend)
+                validez.motivos.append(desacuerdo_lectores)
+                validez.valido = False
             self._log.info(
                 "[VALIDEZ] Track #%d | %s | válida=%s | caracteres=%d lecturas=%d verificador=%s | %s",
                 tracking_id, placa, validez.valido, analisis.caracteres, lecturas,

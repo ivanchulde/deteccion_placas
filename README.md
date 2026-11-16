@@ -75,8 +75,11 @@ gratuito; Docker Desktop exige una suscripción paga en organizaciones grandes (
 ### Red
 
 - IP fija para el servidor, con acceso a la red de las cámaras y a la del personal.
-- Internet solo para descargar este repositorio y compilar las imágenes. En operación el sistema
-  no se conecta a internet (salvo el correo SMTP, si se configura).
+- Internet para descargar este repositorio y compilar las imágenes. En operación el sistema solo
+  sale a internet para el correo SMTP (si se configura) y para completar marca, modelo, tipo y
+  color del vehículo con los datos públicos del SRI (vía ecuadorlegalonline.com) cuando se escribe
+  una placa en un formulario. Esa consulta envía la placa, no datos del propietario. Sin internet,
+  esos campos se llenan a mano. Para apagarla: `VEHICULO_PUBLICO_HABILITADO=false` en el `.env`.
 - Puertos que deben quedar abiertos hacia la red del personal:
 
 | Puerto | Protocolo | Uso |

@@ -63,11 +63,13 @@ FASTALPR_OCR_MODEL: str = os.getenv("FASTALPR_OCR_MODEL", "global-plates-mobile-
 OPENCV_CLAHE_ENABLED: bool = os.getenv("OPENCV_CLAHE_ENABLED", "true").lower() in ("true", "1", "yes")
 OPENCV_UNSHARP_ENABLED: bool = os.getenv("OPENCV_UNSHARP_ENABLED", "true").lower() in ("true", "1", "yes")
 
-# OCR especializado de placas (fast-plate-ocr). Si existe un modelo afinado con placas
-# ecuatorianas (scripts/train_ocr.py), se usa ese ONNX + su plate config; si no, el modelo
-# global del hub. El preprocesado OpenCV se desactiva por defecto: el modelo se entrenó con
+# OCR especializado de placas (fast-plate-ocr). Por omisión se usa el modelo global del hub.
+# El modelo afinado con placas ecuatorianas (scripts/train_ocr.py) NO está activado: en recortes
+# reales fue menos exacto que el global (docs/resultados/ocr_ecuatorianas_2026-11-05.md). Solo se
+# carga si PLATE_OCR_USE_FINETUNED=true y existen su ONNX y su plate config. El preprocesado OpenCV se desactiva por defecto: el modelo se entrenó con
 # imágenes sin realzar y el benchmark mostró que CLAHE/bilateral/unsharp lo empeoran.
 PLATE_OCR_HUB_MODEL: str = os.getenv("PLATE_OCR_HUB_MODEL", "cct-s-v2-global-model")
+PLATE_OCR_USE_FINETUNED: bool = os.getenv("PLATE_OCR_USE_FINETUNED", "false").lower() in ("true", "1", "yes")
 PLATE_OCR_ONNX_PATH: str = os.getenv("PLATE_OCR_ONNX_PATH", "models/ocr/cct_s_v2_ecuador.onnx")
 PLATE_OCR_CONFIG_PATH: str = os.getenv("PLATE_OCR_CONFIG_PATH", "models/ocr/cct_s_v2_ecuador_plate_config.yaml")
 PLATE_OCR_PREPROCESS: bool = os.getenv("PLATE_OCR_PREPROCESS", "false").lower() in ("true", "1", "yes")
@@ -83,6 +85,10 @@ OCR_VERIFIER_MAX_MS: float = float(os.getenv("OCR_VERIFIER_MAX_MS", "2000"))
 REGISTRO_MAX_MS: float = float(os.getenv("REGISTRO_MAX_MS", "1000"))
 # Peso del voto del verificador en el consenso temporal (una lectura normal pesa su confianza ≤ 1)
 OCR_VERIFIER_VOTE_WEIGHT: float = float(os.getenv("OCR_VERIFIER_VOTE_WEIGHT", "2.0"))
+# Si el OCR rápido y el verificador leen placas distintas, el verificador solo reemplaza la lectura
+# cuando su confianza la supera en este margen; el desacuerdo deja la lectura para confirmación humana
+# (app/dominio/eleccion_lectura.py).
+OCR_VERIFIER_OVERRIDE_MARGIN: float = float(os.getenv("OCR_VERIFIER_OVERRIDE_MARGIN", "0.10"))
 
 # --- Hilos por motor de inferencia (CPU) ---
 # PyTorch (detector de placas y atributos del vehículo), ONNX Runtime (OCR rápido) y OpenVINO

@@ -104,6 +104,9 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - SMTP_FROM=${SMTP_FROM:-}
       - ALLOWED_EMAIL_DOMAINS=${ALLOWED_EMAIL_DOMAINS:-ecu911.gob.ec}
+      # Datos públicos del vehículo por placa (SRI): marca, modelo, año, clase y color; false = no sale ninguna placa
+      - VEHICULO_PUBLICO_HABILITADO=${VEHICULO_PUBLICO_HABILITADO:-true}
+      - VEHICULO_PUBLICO_URL=${VEHICULO_PUBLICO_URL:-}
       - REGISTRO_VERIFICACION_EMAIL_HABILITADA=${REGISTRO_VERIFICACION_EMAIL_HABILITADA:-false}
       # URL con la que el personal abre el sistema (enlaces de correo y origen permitido)
       - FRONTEND_URL=${FRONTEND_URL:?Defina FRONTEND_URL en .env (http://IP del servidor:3000)}

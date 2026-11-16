@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AvisoFlotante } from './AvisoFlotante';
 import { useNavigate } from 'react-router-dom';
 import { ImageOff, Loader2, RefreshCw, Trash2 } from 'lucide-react';
@@ -21,6 +21,7 @@ import { horarioValido } from './EditorHorario';
 import { leerHorarioFormulario } from '../../dominio/horario';
 import type { Franja } from '../../dominio/tipos';
 import { ObservacionOcr } from './ObservacionOcr';
+import { aplicarDatosConocidos, type BusquedaPlaca, type CampoAutollenado, datosConocidos, type OrigenDatos } from '../../dominio/datosPlacaConocida';
 
 export { TIPOS_VEHICULO } from '../../dominio/catalogoVehiculos';
 
@@ -511,6 +512,36 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
     && (!formulario.cedula.trim() || /^\d{10}$/.test(formulario.cedula.trim()))
     && fechasOk && !errorHorario && horarioValido(horario);
   const placa = formulario.placa;
+
+  // Dueño y vehículo que el sistema ya conoce de la placa (lista blanca o su último ingreso): se cargan
+  // solos al escribirla. Con otra placa, lo cargado se reemplaza; lo que escribió el guardia no se toca.
+  const [conocida, setConocida] = useState<{ origen: OrigenDatos; alerta: boolean } | null>(null);
+  const autollenado = useRef<Partial<Record<CampoAutollenado, string>>>({});
+  const ultimoFormulario = useRef(formulario);
+  ultimoFormulario.current = formulario;
+  const placaLeida = validarPlaca(placa);
+  const clavePlaca = esIngreso && placaLeida.ok ? placaLeida.valor.placa : '';
+  useEffect(() => {
+    if (!clavePlaca) { setConocida(null); return undefined; }
+    let cancelado = false;
+    const t = window.setTimeout(async () => {
+      try {
+        const r = await api.get<BusquedaPlaca>(`/detecciones/buscar-placa/${encodeURIComponent(clavePlaca)}`);
+        if (cancelado) return;
+        const { origen, datos, alerta } = datosConocidos(r.data);
+        const actual = ultimoFormulario.current;
+        const { formulario: nuevo, aplicados } = aplicarDatosConocidos(actual, datos, autollenado.current);
+        autollenado.current = aplicados;
+        const cambios = Object.fromEntries(Object.entries(nuevo).filter(([k, v]) => actual[k as keyof FormularioPermiso] !== v));
+        if (Object.keys(cambios).length) setFormulario(x => ({ ...x, ...cambios }));
+        setConocida({ origen, alerta });
+      } catch {
+        if (!cancelado) setConocida(null);
+      }
+    }, 350);
+    return () => { cancelado = true; window.clearTimeout(t); };
+  }, [clavePlaca]);
+
   const valido = (!placa.trim() || validarPlaca(placa).ok) && validarTexto(motivo, REGLA_MOTIVO_MANUAL).ok
     && (!esIngreso || datosPermisoValidos);
 
@@ -556,7 +587,7 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
         {esIngreso
           ? <CamposFormularioPermiso prefijo="man" valor={formulario} onCambiar={c => setFormulario(actual => ({ ...actual, ...c }))}
             horario={horario} onHorario={h => { setHorario(h); setErrorHorario(null); }} errorHorario={errorHorario}
-            placaOpcional distribucion="panoramica" />
+            placaOpcional enfocarPlaca distribucion="panoramica" />
           : <section className="completo formulario-seccion">
             <h4 className="permiso-seccion-titulo">Datos del vehículo</h4>
             <div className="form-grid">
@@ -565,6 +596,13 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
                 ayuda="Déjela vacía cuando no haya una matrícula legible." />
             </div>
           </section>}
+        {esIngreso && conocida && (conocida.alerta
+          ? <div className="completo"><Aviso tipo="error">La placa está en la <b>lista negra</b>. Se cargaron los datos que el sistema tiene de ella: siga el protocolo antes de permitir el ingreso.</Aviso></div>
+          : conocida.origen.tipo === 'permiso'
+            ? <AvisoFlotante tipo="info">Placa con permiso en la lista blanca: se cargaron los datos del titular y del vehículo.</AvisoFlotante>
+            : conocida.origen.tipo === 'historial'
+              ? <AvisoFlotante tipo="info">Esta placa ya ingresó el {fechaHora(conocida.origen.fecha)}: se cargaron los datos de la persona y del vehículo de ese ingreso. Confírmelos con el conductor.</AvisoFlotante>
+              : <small className="completo texto-secundario" role="status">Placa sin registros en el sistema: escriba los datos de la persona. Los del vehículo se completan con el SRI cuando los tiene.</small>)}
         <section className="completo formulario-seccion">
           <h4 className="permiso-seccion-titulo">Datos del registro manual</h4>
           {esIngreso && <AvisoFlotante tipo="info">

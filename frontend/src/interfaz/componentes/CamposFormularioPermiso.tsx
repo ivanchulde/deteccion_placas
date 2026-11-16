@@ -7,6 +7,7 @@ import { VigenciaPermiso } from './VigenciaPermiso';
 import { EditorHorario } from './EditorHorario';
 import { MOTIVOS_INGRESO_FRECUENTES, REGLA_MOTIVO_INGRESO, REGLA_OBSERVACIONES } from '../../dominio/reglas';
 import { FotoVehiculoPermiso } from './FotoVehiculoPermiso';
+import { DatosVehiculoSri } from './DatosVehiculoSri';
 
 export interface FormularioPermiso extends PersonaPermiso, VehiculoPermiso {
   placa: string; observaciones: string; fecha_inicio: string; fecha_fin: string;
@@ -19,18 +20,20 @@ export const CamposFormularioPermiso: React.FC<{
   horario: Franja[] | null; onHorario: (v: Franja[] | null) => void;
   errorHorario?: string | null;
   deteccion?: Deteccion; placaObligatoria?: boolean; placaOpcional?: boolean; placaFija?: boolean; vehiculoObligatorio?: boolean; incluirFotoPlaca?: boolean;
+  /** El cursor empieza en la placa (registro manual: con ella se cargan solos el dueño y el vehículo) */
+  enfocarPlaca?: boolean;
   distribucion?: 'normal' | 'panoramica';
   /** false donde el motivo ya se pide aparte (solicitud de acceso, autorización en la garita) */
   mostrarMotivo?: boolean;
   accionesVehiculo?: React.ReactNode; children?: React.ReactNode;
-}> = ({ prefijo, valor, onCambiar, horario, onHorario, errorHorario, deteccion, placaObligatoria = false, placaOpcional = false, placaFija, vehiculoObligatorio = false, incluirFotoPlaca = false, distribucion = 'normal', mostrarMotivo = true, accionesVehiculo, children }) => {
+}> = ({ prefijo, valor, onCambiar, horario, onHorario, errorHorario, deteccion, placaObligatoria = false, placaOpcional = false, placaFija, vehiculoObligatorio = false, incluirFotoPlaca = false, enfocarPlaca = false, distribucion = 'normal', mostrarMotivo = true, accionesVehiculo, children }) => {
   const placaRequerida = !placaOpcional && (placaObligatoria || vehiculoObligatorio);
   const observaciones = <CampoTexto id={`${prefijo}-obs`} className="completo" etiqueta="Observaciones" valor={valor.observaciones} onCambiar={v => onCambiar({ observaciones: v })} regla={REGLA_OBSERVACIONES} multilinea />;
   return <div className={`completo formulario-permiso${distribucion === 'panoramica' ? ' panoramico' : ''}`}>
     <section className="permiso-persona" aria-label="Persona y datos del acceso">
     <fieldset className="formulario-seccion">
       <legend className="etiqueta-campo">Datos de la persona</legend>
-      <div className="form-grid"><CamposPersonaPermiso prefijo={prefijo} valor={valor} onCambiar={(k, v) => onCambiar({ [k]: v })} autoFocus={!deteccion} /></div>
+      <div className="form-grid"><CamposPersonaPermiso prefijo={prefijo} valor={valor} onCambiar={(k, v) => onCambiar({ [k]: v })} autoFocus={!deteccion && !enfocarPlaca} /></div>
     </fieldset>
     {children}
     </section>
@@ -39,8 +42,10 @@ export const CamposFormularioPermiso: React.FC<{
       <legend className="etiqueta-campo" style={{ padding: '0 6px' }}>Datos del vehículo</legend>
       {deteccion && <FotoVehiculoPermiso deteccion={deteccion} incluirPlaca={incluirFotoPlaca} />}
       <div className="form-grid">
-        <CampoPlaca id={`${prefijo}-placa`} className="completo" etiqueta={placaRequerida ? 'Placa*' : 'Placa (opcional)'} requerido={placaRequerida} valor={valor.placa} onCambiar={v => onCambiar({ placa: v })} deshabilitado={placaFija} />
+        <CampoPlaca id={`${prefijo}-placa`} className="completo" etiqueta={placaRequerida ? 'Placa*' : 'Placa (opcional)'} requerido={placaRequerida} valor={valor.placa} onCambiar={v => onCambiar({ placa: v })} deshabilitado={placaFija} autoFocus={enfocarPlaca} />
         <CamposVehiculoPermiso prefijo={prefijo} valor={valor} onCambiar={(k, v) => onCambiar({ [k]: v })} obligatorio={vehiculoObligatorio} />
+        {/* Marca, modelo, tipo y color desde los datos públicos del SRI (solo completa lo vacío) */}
+        <div className="completo"><DatosVehiculoSri placa={valor.placa} valor={valor} onCambiar={onCambiar} /></div>
       </div>
       {accionesVehiculo}
     </fieldset>

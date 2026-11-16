@@ -69,8 +69,8 @@ export const DEFINICIONES: Definicion[] = [
   {
     clave: 'autorizacion_confianza_minima', tipo: 'entero', grupo: 'Operación',
     etiqueta: 'Confianza mínima para autorizar automáticamente (%)',
-    descripcion: 'Una placa del padrón se autoriza sola solo si la confianza alcanza este valor; si es menor, el ingreso queda pendiente para que el personal confirme la placa. Las alertas se emiten siempre, sin importar la confianza.',
-    omision: '82', min: 50, max: 100,
+    descripcion: 'Una placa del padrón se autoriza sola solo si la confianza alcanza este valor; si es menor, el ingreso queda pendiente para que el personal confirme la placa. Las alertas se emiten siempre, sin importar la confianza. Con 95 % la precisión en la garita fue de 100 % y cerca de un tercio de las placas pasa a confirmación del guardia (docs/resultados/precision_garita_2026-11-09).',
+    omision: '95', min: 50, max: 100,
   },
   {
     clave: 'autorizacion_confianza_fuente', tipo: 'opcion', grupo: 'Operación',

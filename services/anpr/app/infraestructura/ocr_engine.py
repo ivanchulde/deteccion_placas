@@ -30,6 +30,7 @@ from app.infraestructura.config import (
     PLATE_OCR_CONFIG_PATH,
     PLATE_OCR_HUB_MODEL,
     PLATE_OCR_ONNX_PATH,
+    PLATE_OCR_USE_FINETUNED,
     PLATE_OCR_PREPROCESS,
     TESSERACT_CMD,
 )
@@ -162,7 +163,9 @@ class FastPlateOcrEngine(OcrEngine):
         onnx_path = _resolve_service_path(PLATE_OCR_ONNX_PATH)
         config_path = _resolve_service_path(PLATE_OCR_CONFIG_PATH)
 
-        if model_name is None and os.path.exists(onnx_path) and os.path.exists(config_path):
+        if model_name is None and PLATE_OCR_USE_FINETUNED and not (os.path.exists(onnx_path) and os.path.exists(config_path)):
+            logger.warning("PLATE_OCR_USE_FINETUNED=true, pero no existe %s o %s: se usa el modelo global.", onnx_path, config_path)
+        if model_name is None and PLATE_OCR_USE_FINETUNED and os.path.exists(onnx_path) and os.path.exists(config_path):
             # Modelo afinado con placas ecuatorianas (scripts/train_ocr.py)
             self._recognizer = LicensePlateRecognizer(
                 onnx_model_path=onnx_path, plate_config_path=config_path, device="cpu", sess_options=sesion

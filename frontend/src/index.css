@@ -1153,6 +1153,15 @@ a.kpi:hover, button.kpi:hover { border-color: var(--kpi-color, var(--border-stro
 .punto.ambar { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); }
 
 .texto-secundario { color: var(--text-3); font-size: 12.5px; }
+/* Autollenado del vehículo con los datos públicos del SRI (DatosVehiculoSri.tsx) */
+.vehiculo-sri { display: inline-flex; align-items: center; gap: 6px; }
+.vehiculo-sri-datos {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface-2, var(--surface)); color: var(--text-2); font-size: 12.5px;
+}
+.vehiculo-sri-datos > svg { color: #1b7f3b; flex-shrink: 0; }
+.vehiculo-sri-datos > span { flex: 1 1 220px; min-width: 0; }
+.vehiculo-sri-datos .btn { margin-left: auto; }
 .mono { font-family: var(--mono); }
 .nowrap { white-space: nowrap; }
 .truncar { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

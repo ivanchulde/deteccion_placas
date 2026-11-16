@@ -22,6 +22,7 @@ import configuracionRoutes from './interfaz/http/rutas/configuracion';
 import auditoriaRoutes from './interfaz/http/rutas/auditoria';
 import mediosRoutes from './interfaz/http/rutas/medios';
 import propietarioRoutes from './interfaz/http/rutas/propietario';
+import vehiculoPublicoRoutes from './interfaz/http/rutas/vehiculoPublico';
 import notificacionesRoutes from './interfaz/http/rutas/notificaciones';
 import mensajesRoutes from './interfaz/http/rutas/mensajes';
 import solicitudesAccesoRoutes from './interfaz/http/rutas/solicitudesAcceso';
@@ -47,6 +48,7 @@ export const MONTAJES: [string, express.Router][] = [
   ['/api/auditoria', auditoriaRoutes],
   ['/api/medios', mediosRoutes],
   ['/api/propietario', propietarioRoutes],
+  ['/api/vehiculo-publico', vehiculoPublicoRoutes],
   ['/api/notificaciones', notificacionesRoutes],
   ['/api/mensajes', mensajesRoutes],
   ['/api/solicitudes-acceso', solicitudesAccesoRoutes],

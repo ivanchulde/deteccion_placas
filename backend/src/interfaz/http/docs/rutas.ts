@@ -989,6 +989,18 @@ export const RUTAS: RutaDoc[] = [
     resumen: 'Últimas consultas de propietario registradas',
   },
 
+  // ─── Datos públicos del vehículo (SRI) ──────────────────────────────────────
+  {
+    metodo: 'get', ruta: '/api/vehiculo-publico/:placa', etiqueta: 'Vehículo (SRI)',
+    acceso: { algunoDe: ['detecciones:validar', 'padron:agregar', 'padron:gestionar', 'solicitudes:crear', 'alertas:restringir'] },
+    resumen: 'Marca, modelo, año, clase y color públicos de una placa',
+    descripcion: 'Datos de matriculación del SRI (vía ecuadorlegalonline.com) para autocompletar los formularios. Sin datos del propietario. '
+      + 'Caché de 12 h por placa; cada consulta que sale del sistema queda en la auditoría (CONSULTA_VEHICULO). Se desactiva con VEHICULO_PUBLICO_HABILITADO=false.',
+    respuestas: {
+      400: 'Placa inválida', 404: 'El SRI no tiene datos de la placa', 502: 'Servicio caído o sin internet', 503: 'Consulta desactivada',
+    },
+  },
+
   // ─── Mensajería interna ─────────────────────────────────────────────────────
   {
     metodo: 'get', ruta: '/api/mensajes/contactos', etiqueta: 'Mensajes', acceso: 'sesion',

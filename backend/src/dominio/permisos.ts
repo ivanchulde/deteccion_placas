@@ -77,12 +77,14 @@ export type Permiso = keyof typeof PERMISOS;
 /** Matriz rol → permisos. */
 export const MATRIZ: Record<Rol, readonly Permiso[]> = {
   // Punto de control: monitorea, valida lecturas, consulta las listas y solicita accesos. Agrega placas a
-  // las listas desde la garita y edita los datos de los registros activos. El retiro, la
-  // reactivación de permisos y la importación se controlan por separado.
+  // las listas desde la garita, edita los datos de los registros activos y retira permisos de la
+  // lista blanca. El retiro de alertas de la lista negra queda reservado a la administración
+  // (decisión del 13-11-2026): quien es controlado en la garita no debe poder levantar una alerta.
+  // La reactivación de permisos y la importación se controlan por separado.
   // Recibe los avisos de garita y la notificación de cada permiso otorgado.
   Guardia: [
     'operacion:monitorear', 'detecciones:validar', 'detecciones:eliminar-individual', 'listas:ver', 'listas:editar-ficha', 'listas:editar-registro',
-    'padron:agregar', 'padron:retirar', 'solicitudes:crear', 'alertas:restringir', 'alertas:retirar',
+    'padron:agregar', 'padron:retirar', 'solicitudes:crear', 'alertas:restringir',
     'avisos:garita', 'avisos:acceso', 'avisos:seguridad', 'avisos:padron',
   ],
   // Una sola vista (gestión de permisos), sin monitoreo: concede permisos de placa.
