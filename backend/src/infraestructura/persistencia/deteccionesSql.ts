@@ -621,6 +621,33 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
     return r.recordset.map(fila => fila.id);
   },
 
+  async personaPorCedula(cedula) {
+    // Orden: permiso vigente, último ingreso con esa cédula, última solicitud y permiso anterior.
+    // En el ingreso, lo que nunca se escribió (NULL) se toma del permiso con que entró; '' fue vaciado a propósito.
+    const r = await db().request().input('cedula', sql.VarChar(10), cedula).query(`
+      SELECT origen, fecha, propietario, institucion, cargo, departamento FROM (
+        SELECT 1 AS prioridad, 'permiso' AS origen, NULL::timestamp AS fecha, id AS orden,
+               propietario, institucion, cargo, departamento
+        FROM ListaBlanca WHERE cedula = @cedula AND activo = TRUE
+        UNION ALL
+        SELECT 2, 'ingreso', d.fecha_hora_ingreso, d.id,
+               COALESCE(d.persona_ingreso, v.propietario), COALESCE(d.institucion_ingreso, v.institucion),
+               COALESCE(d.cargo_ingreso, v.cargo), COALESCE(d.departamento_ingreso, v.departamento)
+        FROM DeteccionVehiculo d LEFT JOIN ListaBlanca v ON v.id = d.vehiculo_autorizado_id
+        WHERE d.cedula_ingreso = @cedula
+        UNION ALL
+        SELECT 3, 'solicitud', s.fecha_solicitud, s.id, s.propietario, s.institucion, s.cargo, s.departamento
+        FROM SolicitudesAcceso s WHERE s.cedula = @cedula
+        UNION ALL
+        SELECT 4, 'permiso_anterior', NULL::timestamp, id, propietario, institucion, cargo, departamento
+        FROM ListaBlanca WHERE cedula = @cedula AND activo IS NOT TRUE
+      ) x
+      WHERE NULLIF(TRIM(propietario), '') IS NOT NULL
+      ORDER BY prioridad, fecha DESC NULLS LAST, orden DESC
+      LIMIT 1`);
+    return r.recordset[0] ?? null;
+  },
+
   async permisosActivosPorCedula(cedula) {
     const r = await db().request().input('cedula', sql.VarChar(10), cedula).query(`
       SELECT id, cedula, propietario, placa, tipo_vehiculo, marca, modelo, color, motivo_ingreso,

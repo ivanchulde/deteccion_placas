@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authMiddleware, requierePermiso, servicioMiddleware } from '../middlewares/auth';
+import { authMiddleware, requierePermiso, requiereUnoDe, servicioMiddleware } from '../middlewares/auth';
 import { detecciones } from '../../../contenedor/detecciones';
 import { actorDe, controlador, escribirRespuesta, idDe, limitarSimultaneas } from '../respuesta';
 
@@ -19,6 +19,7 @@ import { actorDe, controlador, escribirRespuesta, idDe, limitarSimultaneas } fro
  *   GET  /recientes            últimos N pasos (monitoreo)
  *   GET  /exportar             CSV con los mismos filtros del historial
  *   GET  /buscar-placa/:placa  situación de una placa en las listas y su historial
+ *   GET  /buscar-cedula/:cedula  datos de la persona que el sistema ya tiene (autollenado)
  *   GET  /:id                  detalle completo con lectura automática, metadatos y auditoría
  *   POST /validar/:id          corrección / confirmación del personal (excepción con accesos:excepcion)
  *   POST /:id/salida            registra la hora de salida de un ingreso existente
@@ -40,6 +41,7 @@ const validar = [authMiddleware, requierePermiso('detecciones:validar')];
 const eliminar = [authMiddleware, requierePermiso('detecciones:eliminar')];
 const gestionar = [authMiddleware, requierePermiso('detecciones:gestionar')];
 const eliminarIndividual = [authMiddleware, requierePermiso('detecciones:eliminar-individual')];
+const formularios = [authMiddleware, requiereUnoDe('detecciones:validar', 'padron:agregar', 'padron:gestionar', 'solicitudes:crear', 'alertas:restringir')];
 const unaExportacionALaVez = limitarSimultaneas(2, 'Hay otras exportaciones en curso. Intente de nuevo en un momento.');
 
 // ─── Servicio ANPR ───────────────────────────────────────────────────────────
@@ -106,6 +108,11 @@ router.get('/registros.pdf', ...monitorear, unaExportacionALaVez, controlador('D
 
 router.get('/buscar-placa/:placa', ...monitorear, controlador('DETECCIONES buscar placa', 'Error al buscar la placa.', async (req, res) => {
   res.json(await detecciones.buscarPlaca(req.params.placa));
+}));
+
+// Los mismos roles que llenan los formularios de ingreso y de permisos (como /api/vehiculo-publico)
+router.get('/buscar-cedula/:cedula', ...formularios, controlador('DETECCIONES buscar cédula', 'Error al buscar la cédula.', async (req, res) => {
+  res.json(await detecciones.buscarCedula(req.params.cedula));
 }));
 
 router.get('/:id(\\d+)', ...monitorear, controlador('DETECCIONES detalle', 'Error al consultar la detección.', async (req, res) => {

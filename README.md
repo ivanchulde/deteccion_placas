@@ -439,6 +439,7 @@ lista blanca como en la [sección 6](#6-cargar-la-lista-blanca), usando `docker 
 | Desde otro equipo no se puede iniciar sesión | `FRONTEND_URL` no tiene la IP real del servidor | Corríjala en `.env` y ejecute `docker compose -f docker-compose.prod.yml up -d` |
 | La página abre pero no se ve el video | `WEBRTC_HOSTS` o `WEBRTC_PUBLIC_URL` sin la IP del servidor, o el puerto 8189 cerrado | Revise esas variables y el firewall (8189 UDP y TCP) |
 | La cámara no se puede registrar por la red | Su IP no está en `CAMARAS_REDES_PERMITIDAS` | Agregue la red de las cámaras (CIDR) y reinicie con `up -d` |
+| El enlace de la cámara muestra `admin:******@…` y en VLC no abre | La contraseña se oculta en pantalla a propósito; el sistema se conecta con la real. Un enlace copiado con asteriscos no sirve en VLC | Para VLC, escriba la contraseña en lugar de los asteriscos (o, al registrar la cámara, pulse el ojo de la contraseña y copie el enlace). Si el sistema tampoco muestra el video, edite la cámara, vuelva a escribir la contraseña y guarde: una versión anterior podía guardar los asteriscos como contraseña si se pegaba el enlace oculto |
 | `relation "listablanca" does not exist` al cargar la lista | El sistema aún no arrancó por primera vez | Espere a que `backend` esté `healthy` y repita la sección 6 |
 | `port is already allocated` | Otro programa usa el puerto 3000, 8000 u 8889 | Libérelo; el puerto web se puede cambiar con `PUERTO_WEB` en `.env` |
 | Windows: el motor se reinicia solo | Poca memoria para WSL 2 | Revise el paso 3.2 |

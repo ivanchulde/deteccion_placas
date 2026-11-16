@@ -118,8 +118,15 @@ export function leerUrlRtsp(valor: unknown, guardada?: string | null): Validado<
   if (!RE_URL_RTSP.test(escrita)) return { ok: false, error: MENSAJE_URL_RTSP };
   // Esquema en minúsculas: MediaMTX rechaza «RTSP://» (y al rechazarla registra la URL completa)
   const rtsp = restaurarClave(escrita.replace(/^rtsps?:\/\//i, e => e.toLowerCase()), guardada);
-  if (guardada && rtsp.match(RE_CREDENCIALES)?.[2] === MASCARA) {
+  const clave = rtsp.match(RE_CREDENCIALES)?.[2];
+  if (guardada && clave === MASCARA) {
     return { ok: false, error: 'URL RTSP: escriba de nuevo la contraseña de la cámara (la guardada solo se conserva si no cambian el equipo, el puerto ni el esquema).' };
+  }
+  // Una contraseña hecha solo de asteriscos es la que el sistema muestra oculta (******, o ****
+  // en los registros del motor) copiada en el formulario: guardarla mandaría los asteriscos a la
+  // cámara y esta rechazaría la conexión.
+  if (clave && /^\*+$/.test(clave)) {
+    return { ok: false, error: `URL RTSP: «${clave}» es la contraseña oculta que muestra el sistema, no la de la cámara. Escriba la contraseña real.` };
   }
   if (rtsp.length > LARGO_MAXIMO_RTSP) return { ok: false, error: `URL RTSP: máximo ${LARGO_MAXIMO_RTSP} caracteres.` };
   return { ok: true, valor: rtsp };

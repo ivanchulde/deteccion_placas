@@ -159,6 +159,11 @@ export interface RepositorioDetecciones {
   ingresoAbiertoPorPlaca(placa: string): Promise<number | null>;
   ingresosAbiertosPorCedula(cedula: string): Promise<number[]>;
   permisosActivosPorCedula(cedula: string): Promise<Fila[]>;
+  /**
+   * Datos de la persona registrados con esa cédula (origen, fecha, propietario, institución, cargo y
+   * departamento): su permiso vigente, su último ingreso, su última solicitud o un permiso anterior.
+   */
+  personaPorCedula(cedula: string): Promise<Fila | null>;
   registrarSalida(id: number, permitirFichaIncompleta?: boolean): Promise<boolean>;
   /**
    * Cierra con la salida `salidaId` el ingreso sin salida más reciente de esa placa, si entró hace al
@@ -760,6 +765,27 @@ export function casosDetecciones(d: DependenciasDetecciones) {
           ...(horario!.error ? { horario_error: 'El horario guardado no es válido. Seleccione un horario antes de guardar.' } : {}),
           horario_texto: describirHorario(cruce.permiso.horario) } : null,
         ultimos_ingresos: historial.map(x => d.presentar(x)),
+      };
+    },
+
+    /**
+     * Datos de una persona por su cédula, para autollenar los formularios: nombre, institución,
+     * cargo y departamento de su permiso vigente, su último ingreso, su última solicitud o un
+     * permiso anterior, en ese orden. Solo datos del propio sistema: la cédula no sale a ningún
+     * servicio externo.
+     */
+    async buscarCedula(valor: unknown) {
+      const cedula = typeof valor === 'string' ? valor.trim() : '';
+      if (!/^\d{10}$/.test(cedula)) throw errorValidacion('La cédula debe tener exactamente 10 dígitos.');
+      const f = await d.repositorio.personaPorCedula(cedula);
+      const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+      const propietario = texto(f?.propietario);
+      if (!f || !propietario) return { cedula, origen: null, fecha: null, persona: null };
+      return {
+        cedula,
+        origen: f.origen as 'permiso' | 'ingreso' | 'solicitud' | 'permiso_anterior',
+        fecha: f.fecha ? new Date(f.fecha).toISOString() : null,
+        persona: { propietario, institucion: texto(f.institucion), cargo: texto(f.cargo), departamento: texto(f.departamento) },
       };
     },
 

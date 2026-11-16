@@ -8,6 +8,7 @@ import { EditorHorario } from './EditorHorario';
 import { MOTIVOS_INGRESO_FRECUENTES, REGLA_MOTIVO_INGRESO, REGLA_OBSERVACIONES } from '../../dominio/reglas';
 import { FotoVehiculoPermiso } from './FotoVehiculoPermiso';
 import { DatosVehiculoSri } from './DatosVehiculoSri';
+import { DatosPersonaCedula } from './DatosPersonaCedula';
 
 export interface FormularioPermiso extends PersonaPermiso, VehiculoPermiso {
   placa: string; observaciones: string; fecha_inicio: string; fecha_fin: string;
@@ -33,7 +34,11 @@ export const CamposFormularioPermiso: React.FC<{
     <section className="permiso-persona" aria-label="Persona y datos del acceso">
     <fieldset className="formulario-seccion">
       <legend className="etiqueta-campo">Datos de la persona</legend>
-      <div className="form-grid"><CamposPersonaPermiso prefijo={prefijo} valor={valor} onCambiar={(k, v) => onCambiar({ [k]: v })} autoFocus={!deteccion && !enfocarPlaca} /></div>
+      <div className="form-grid">
+        <CamposPersonaPermiso prefijo={prefijo} valor={valor} onCambiar={(k, v) => onCambiar({ [k]: v })} autoFocus={!deteccion && !enfocarPlaca} />
+        {/* Nombre, institución, cargo y departamento que el sistema ya tiene de esa cédula (solo completa lo vacío) */}
+        <div className="completo"><DatosPersonaCedula cedula={valor.cedula} valor={valor} onCambiar={onCambiar} /></div>
+      </div>
     </fieldset>
     {children}
     </section>

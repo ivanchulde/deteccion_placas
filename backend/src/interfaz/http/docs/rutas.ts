@@ -591,6 +591,14 @@ export const RUTAS: RutaDoc[] = [
     respuestas: { 400: 'Placa demasiado corta' },
   },
   {
+    metodo: 'get', ruta: '/api/detecciones/buscar-cedula/:cedula', etiqueta: 'Detecciones',
+    acceso: { algunoDe: ['detecciones:validar', 'padron:agregar', 'padron:gestionar', 'solicitudes:crear', 'alertas:restringir'] },
+    resumen: 'Datos de la persona registrados con una cédula (autollenado)',
+    descripcion: 'Nombre, institución, cargo y departamento de su permiso vigente, su último ingreso, su última solicitud o un permiso anterior, en ese orden. '
+      + 'Solo datos del propio sistema: la cédula no sale a ningún servicio externo. Sin registros responde persona: null.',
+    respuestas: { 400: 'La cédula no tiene 10 dígitos' },
+  },
+  {
     metodo: 'get', ruta: '/api/detecciones/:id(\\d+)', etiqueta: 'Detecciones', acceso: 'operacion:monitorear',
     resumen: 'Detalle de un ingreso con lectura automática y auditoría',
     respuestas: { 404: 'Detección no encontrada' },

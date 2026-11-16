@@ -219,25 +219,36 @@ export const FormularioCamara: React.FC<{ camara?: Camara; onCerrar: () => void;
     const u = usuario.trim();
     const c = clave || (claveGuardada && u ? MASCARA : '');
     const auth = u ? `${encodeURIComponent(u)}${c ? `:${c === MASCARA ? MASCARA : encodeURIComponent(c)}` : ''}@` : '';
-    const authVisible = u ? `${encodeURIComponent(u)}${c ? `:${MASCARA}` : ''}@` : '';
+    // Con el ojo de la contraseña abierto, el enlace muestra la que se acaba de escribir (el enlace
+    // exacto que se usará, para copiarlo a VLC); la guardada nunca llega al navegador.
+    const authVisible = verClave && clave ? auth : u ? `${encodeURIComponent(u)}${c ? `:${MASCARA}` : ''}@` : '';
     const base = (r: string) => `${host.trim()}:${Number(puerto) || p.puerto}${r}`;
     const vista = usarVista && secundaria;
     return {
       url: `rtsp://${auth}${base(conBarra(ruta))}`, urlVisible: `rtsp://${authVisible}${base(conBarra(ruta))}`,
       urlVista: vista ? `rtsp://${auth}${base(vista)}` : '', urlVistaVisible: vista ? `rtsp://${authVisible}${base(vista)}` : '',
     };
-  }, [perfil, urlManual, urlVistaManual, host, puerto, ruta, usuario, clave, claveGuardada, p.puerto, usarVista, secundaria]);
+  }, [perfil, urlManual, urlVistaManual, host, puerto, ruta, usuario, clave, claveGuardada, p.puerto, usarVista, secundaria, verClave]);
 
   // Mismas reglas que la API: nombre y ubicación alfanuméricos, IP o host válido, puerto 1–65535 y
   // enlace rtsp:// de hasta 255 caracteres. Las credenciales son opcionales en todos los perfiles.
   const guiado = perfil !== 'manual';
   const exigeCredenciales = false;
   const errorHost = guiado ? errorIp(host) : null;
-  const errorUrl = guiado ? null : errorUrlRtsp(urlManual);
+  // La contraseña oculta (******) solo sirve en la edición, donde el servidor recupera la guardada;
+  // cualquier otra contraseña hecha solo de asteriscos es la máscara copiada de la pantalla.
+  const errorAsteriscos = (u: string) => {
+    const c = u.trim().match(RE_CREDENCIALES)?.[2];
+    return c && /^\*+$/.test(c) && !(c === MASCARA && camara?.tiene_credenciales)
+      ? `«${c}» es la contraseña oculta que muestra el sistema, no la de la cámara: escriba la contraseña real.` : null;
+  };
+  const errorUrl = guiado ? null : errorUrlRtsp(urlManual) ?? errorAsteriscos(urlManual);
   const errorEnlace = guiado && url ? errorFormatoRtsp(url) : null;
-  const errorVista = guiado ? (urlVista ? errorFormatoRtsp(urlVista) : null) : (urlVistaManual.trim() ? errorUrlRtsp(urlVistaManual) : null);
+  const errorVista = guiado ? (urlVista ? errorFormatoRtsp(urlVista) : null)
+    : (urlVistaManual.trim() ? errorUrlRtsp(urlVistaManual) ?? errorAsteriscos(urlVistaManual) : null);
   const reescribirClave = Boolean(camara?.tiene_credenciales && otroEquipo && usuario.trim() && !clave);
-  const errorClave = reescribirClave ? 'Cambió la IP o el puerto: escriba de nuevo la contraseña.' : null;
+  const errorClave = reescribirClave ? 'Cambió la IP o el puerto: escriba de nuevo la contraseña.'
+    : guiado && /^\*+$/.test(clave) && !(clave === MASCARA && claveGuardada) ? `«${clave}» es la contraseña oculta que muestra el sistema: escriba la contraseña real de la cámara.` : null;
   const hostValido = guiado ? !errorHost : !errorUrl;
   const valido = sinErrores({
     nombre: errorDe(validarTexto(nombre, REGLAS_CAMARA.nombre)),
@@ -371,7 +382,12 @@ export const FormularioCamara: React.FC<{ camara?: Camara; onCerrar: () => void;
                       ? <span className="error">{errorEnlace === MENSAJE_URL_RTSP
                         ? 'El enlace tiene espacios o caracteres no permitidos (< >): revise la ruta del flujo.'
                         : `El enlace supera los ${LARGO_MAXIMO_RTSP} caracteres que admite el sistema: acorte la ruta, el usuario o la contraseña.`}</span>
-                      : <span className="ayuda">La contraseña se guarda cifrada en el servidor y no se muestra a ningún usuario.</span>}
+                      : verClave && clave
+                        ? <span className="ayuda">Este es el enlace exacto con el que el sistema se conectará: puede copiarlo para probarlo en VLC.</span>
+                        : <span className="ayuda">
+                          Por seguridad la contraseña se muestra como {MASCARA}, pero el sistema se conecta con la real (se guarda cifrada y no se muestra a nadie).
+                          Un enlace con asteriscos no abre en VLC: {clave ? 'pulse el ojo de la contraseña y copie el enlace.' : 'escriba la contraseña en lugar de los asteriscos.'}
+                        </span>}
                   </div>
                 </>
               )}
