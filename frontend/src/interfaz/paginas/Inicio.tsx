@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Activity, ArrowRight, CarFront, CheckCircle2, CircleAlert, CircleHelp, History, LogOut, MonitorPlay, ShieldCheck, ShieldX, Siren,
+  Activity, ArrowRight, CarFront, CheckCircle2, CircleAlert, CircleHelp, History, MonitorPlay, ShieldCheck, ShieldX, Siren,
   TrendingDown, TrendingUp,
 } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
@@ -215,15 +215,6 @@ const PanelOperador: React.FC = () => {
           <p className="guardia-indicacion">{salidaManual
             ? 'El sistema identifica si corresponde una entrada o una salida, ya sea por placa o por cédula.'
             : 'La salida manual está desactivada; la cámara registra la salida por placa.'}</p>
-        </section>
-        <section className="guardia-celda guardia-dentro" aria-label="Vehículos dentro">
-          <span>Vehículos dentro</span><strong>{cargando && !r ? '…' : numero(r?.movimientos?.dentro)}</strong>
-          <small>Vehículos que entraron y todavía no registran salida: cada entrada suma uno y cada salida resta uno.</small>
-          <div className="fila guardia-enlaces">
-            <Link to="/detecciones" className="btn btn-secondary btn-sm"><LogOut size={14} /> Registro de Salidas: {cargando && !r ? '…' : numero(r?.movimientos?.registros_completos)}</Link>
-            <Link to="/historial" className="btn btn-secondary btn-sm"><History size={14} /> Historial completo</Link>
-          </div>
-          <small className="texto-secundario guardia-historico">Accesos en el historial: {cargando && !r ? '…' : numero(r?.movimientos?.registros_acceso)}</small>
         </section>
         <BalanceGuardia entradas={r?.movimientos?.entradas ?? 0} salidas={r?.movimientos?.salidas ?? 0} cargando={cargando && !r} />
       </div>
