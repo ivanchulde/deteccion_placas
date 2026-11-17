@@ -3,7 +3,8 @@ import type { EstadoValidacion, RestriccionAcceso } from '../dominio/decisionAcc
 import { esSinPlaca, evidenciaDe, motivoRevision, normalizarFuente, origenDe, type PasoGuardado } from '../dominio/detecciones';
 import { politicaAutorizacion } from './servicios/configuracion';
 import { urlMedia } from './servicios/media';
-import { datoRegistro, datosRegistro, faltantesRegistro } from '../dominio/registroCompleto';
+import { datosRegistro, faltantesRegistro } from '../dominio/registroCompleto';
+import { vehiculoSriVigente } from '../dominio/vehiculoPublico';
 import { validarHorario } from '../dominio/horario';
 
 /** Columna DATE como AAAA-MM-DD (null sin fecha). */
@@ -16,6 +17,7 @@ const dia = (v: unknown): string | null => (v ? new Date(v as string).toISOStrin
  */
 export function presentarDeteccion(d: Fila, detalle = false): DeteccionDTO {
   const registro = datosRegistro(d);
+  const sri = vehiculoSriVigente(d);
   const faltantes = faltantesRegistro(d);
   const evidencia = evidenciaDe(d);
   const datosPadron = d.vehiculo_autorizado_id ? {
@@ -69,7 +71,9 @@ export function presentarDeteccion(d: Fila, detalle = false): DeteccionDTO {
     imagen_placa: urlMedia(d.ruta_imagen_placa || d.ruta_imagen_ingreso),
     camara: d.camara_id ? { id: d.camara_id, nombre: d.camara_nombre, ubicacion: d.camara_ubicacion } : null,
     tipo_vehiculo: registro.tipo,
-    vehiculo: { tipo: registro.tipo, marca: registro.marca, modelo: datoRegistro(d.vehiculo_modelo, d.autorizado_modelo), color: d.vehiculo_color },
+    vehiculo: { tipo: registro.tipo, marca: registro.marca, modelo: registro.modelo, color: d.vehiculo_color },
+    // Datos públicos del SRI de la placa actual (la interfaz indica qué celda se completó con ellos)
+    vehiculo_sri: sri ? { tipo: sri.tipo, marca: sri.marca, modelo: sri.modelo, clase: sri.clase, anio: sri.anio, color: sri.color } : null,
     verificacion_vehiculo: d.verificacion_vehiculo ?? null,
     verificacion_detalle: d.verificacion_detalle ?? null,
     alerta: d.alerta_id ? { id: d.alerta_id, motivo: d.alerta_motivo, nivel: d.nivel_alerta } : null,

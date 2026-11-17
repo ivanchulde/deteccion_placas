@@ -6,6 +6,8 @@ import type { Decision } from '../../dominio/decisionAcceso';
 import { type FiltrosDetecciones, palabrasBusqueda, VENTANA_MISMO_PASO_S } from '../../dominio/detecciones';
 import { guardarAtributosVehiculo, guardarMetadatosCaptura, type LecturaAutomatica, registrarLecturaAutomatica } from '../servicios/metadatosDeteccion';
 import { desfaseMinutos } from '../servicios/tiempo';
+import { placaAnt } from '../../dominio/validacion';
+import { placaAntSql } from './placaSql';
 
 /**
  * Repositorio SQL Server de los pasos vehiculares (DeteccionVehiculo), con la cámara, la alerta,
@@ -288,6 +290,16 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
     if (x.modelo !== undefined) { request.input('modelo', sql.VarChar(50), x.modelo); campos.push('vehiculo_modelo = @modelo'); }
     if (x.color !== undefined) { request.input('color', sql.VarChar(30), x.color); campos.push('vehiculo_color = @color'); }
     if (campos.length) await request.query(`UPDATE DeteccionVehiculo SET ${campos.join(', ')} WHERE id = @id`);
+  },
+
+  async guardarVehiculoSri(id, placa, sri) {
+    const r = await db().request()
+      .input('id', sql.Int, id)
+      .input('placa', sql.VarChar(20), placaAnt(placa))
+      .input('sri', sql.VarChar(600), sri)
+      .query(`UPDATE DeteccionVehiculo SET vehiculo_sri = @sri
+              WHERE id = @id AND ${placaAntSql("COALESCE(NULLIF(placa_validada, ''), placa_reconocida)")} = @placa`);
+    return (r.rowsAffected?.[0] ?? 0) > 0;
   },
 
   async guardarEdicionRegistro(id, x) {

@@ -49,8 +49,8 @@ export const CamposFormularioPermiso: React.FC<{
       <div className="form-grid">
         <CampoPlaca id={`${prefijo}-placa`} className="completo" etiqueta={placaRequerida ? 'Placa*' : 'Placa (opcional)'} requerido={placaRequerida} valor={valor.placa} onCambiar={v => onCambiar({ placa: v })} deshabilitado={placaFija} autoFocus={enfocarPlaca} />
         <CamposVehiculoPermiso prefijo={prefijo} valor={valor} onCambiar={(k, v) => onCambiar({ [k]: v })} obligatorio={vehiculoObligatorio} />
-        {/* Marca, modelo, tipo y color desde los datos públicos del SRI (solo completa lo vacío) */}
-        <div className="completo"><DatosVehiculoSri placa={valor.placa} valor={valor} onCambiar={onCambiar} /></div>
+        {/* Marca, modelo, tipo y color desde los datos públicos del SRI (solo completa lo vacío, sin cuadro) */}
+        <DatosVehiculoSri placa={valor.placa} valor={valor} onCambiar={onCambiar} />
       </div>
       {accionesVehiculo}
     </fieldset>

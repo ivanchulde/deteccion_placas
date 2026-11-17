@@ -32,6 +32,16 @@ export function normalizarPlaca(valor: unknown): string {
   return String(valor ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+/**
+ * Forma vigente de la ANT: las placas de automóvil de 3 dígitos (formato anterior, ABC-123) se
+ * escriben hoy con un 0 delante (ABC-0123), como las registran la ANT y el SRI. Es el mismo
+ * vehículo: las listas y los pasos se comparan en esta forma ("pzx-970" → "PZX0970").
+ */
+export function placaAnt(valor: unknown): string {
+  const p = normalizarPlaca(valor);
+  return /^[A-Z]{3}\d{3}$/.test(p) ? `${p.slice(0, 3)}0${p.slice(3)}` : p;
+}
+
 export function tipoPlaca(placa: string): TipoPlaca | null {
   if (RE_PLACA_AUTO.test(placa)) return 'auto';
   if (RE_PLACA_MOTO.test(placa)) return 'moto';

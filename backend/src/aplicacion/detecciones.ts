@@ -11,8 +11,9 @@ import {
 } from '../dominio/detecciones';
 import { describirHorario, evaluarVigencia, validarHorario, type Vigencia } from '../dominio/horario';
 import { type Rol, tienePermiso } from '../dominio/permisos';
-import { normalizarPlaca, validarEntero, validarPlaca, validarTexto } from '../dominio/validacion';
-import { faltantesIngreso } from '../dominio/registroCompleto';
+import { normalizarPlaca, placaAnt, validarEntero, validarPlaca, validarTexto } from '../dominio/validacion';
+import { datoRegistro, datosRegistro, faltantesIngreso } from '../dominio/registroCompleto';
+import { type DatosVehiculoPublico, leerVehiculoSri, vehiculoSriDelPaso } from '../dominio/vehiculoPublico';
 
 /**
  * Detecciones vehiculares: cada registro es un paso por un acceso.
@@ -190,6 +191,11 @@ export interface RepositorioDetecciones {
   camaraIngresoUnica?(): Promise<number | null>;
   /** Nombres y apellidos de quien ingresa y motivo de ingreso (solo los campos presentes) */
   guardarDatosIngreso(id: number, d: DatosIngreso): Promise<void>;
+  /**
+   * Guarda los datos del SRI (JSON) en el paso solo si su placa sigue siendo `placa`; false si el
+   * personal la cambió mientras se consultaba.
+   */
+  guardarVehiculoSri?(id: number, placa: string, sri: string): Promise<boolean>;
   /** Corrección histórica atómica: no concede accesos ni modifica permisos de las listas. */
   guardarEdicionRegistro(id: number, d: { datos: Omit<DatosIngreso, 'ficha'>; placa?: string | null; placaAnterior?: string | null; usuarioId: number }): Promise<boolean>;
   /** Crea/vincula un permiso por nombre para un ingreso sin placa ya identificado en garita. */
@@ -272,6 +278,12 @@ export interface DependenciasDetecciones {
   evidenciaListas?: { conservar(fila: Fila): Promise<void> };
   /** Últimos 30 s de las cámaras que analiza el motor, para la foto del registro manual */
   evidenciaManual?: PuertoEvidenciaManual;
+  /**
+   * Datos públicos del vehículo (SRI) por placa: con ellos el sistema completa tipo, marca y modelo
+   * de la fila al leer una placa fiable. null = el SRI no tiene la placa; lanza si el servicio
+   * falla. Sin este puerto (VEHICULO_PUBLICO_AUTOMATICO=false) la fila se completa a mano.
+   */
+  vehiculoSri?: { consultar(placa: string): Promise<DatosVehiculoPublico | null> };
   eventos: PuertoEventos;
   auditoria: PuertoAuditoria;
   tiempo: { ahora(): Date; zona: string };
@@ -315,7 +327,64 @@ export function casosDetecciones(d: DependenciasDetecciones) {
     const dto = d.presentar(fila);
     d.eventos.emitir(evento, dto);
     if (dto.estado_validacion === 'alerta') d.eventos.emitir('deteccion:alerta', dto);
+    completarConSri(fila);
     return dto;
+  }
+
+  // ─── Datos públicos del vehículo (SRI) en la fila ─────────────────────────────
+  // Una consulta a la vez (el sitio es gratuito y externo) y como máximo 50 en espera; una placa
+  // que falló (sin internet, servicio caído) no se reintenta durante 5 minutos.
+  const sriEnEspera = new Set<number>();
+  const sriFallos = new Map<string, number>();
+  let colaSri: Promise<void> = Promise.resolve();
+
+  /** Placa de la fila que se debe consultar en el SRI, o null si no corresponde. */
+  function placaParaSri(f: Fila): string | null {
+    if (!d.vehiculoSri || !d.repositorio.guardarVehiculoSri || f.tipo_movimiento === 'salida') return null;
+    const p = validarPlaca(f.placa_validada || f.placa_reconocida);
+    if (!p.ok) return null;
+    const placa = p.valor.placa;
+    // Solo lecturas fiables: una placa mal leída traería los datos de otro vehículo
+    const fiable = Boolean(f.validado_manualmente) || Boolean(f.lectura_valida)
+      || (typeof f.confianza_ocr === 'number' && f.confianza_ocr >= d.politica().confianzaMinima);
+    if (!fiable) return null;
+    // Ya consultada para esta placa (con o sin datos)
+    if (placaAnt(leerVehiculoSri(f.vehiculo_sri)?.placa) === placaAnt(placa)) return null;
+    // El personal o el permiso ya llenaron marca, modelo y tipo: no hace falta salir del sistema
+    const r = datosRegistro(f);
+    if (r.marca && r.modelo && datoRegistro(f.tipo_vehiculo)) return null;
+    const fallo = sriFallos.get(placa);
+    if (fallo !== undefined && d.tiempo.ahora().getTime() - fallo < 5 * 60_000) return null;
+    return placa;
+  }
+
+  /** Encola la consulta (sin esperarla): al llegar los datos se guardan en el paso y la fila se difunde. */
+  function completarConSri(f: Fila): void {
+    const placa = placaParaSri(f);
+    const id = Number(f.id);
+    if (!placa || sriEnEspera.has(id) || sriEnEspera.size >= 50) return;
+    sriEnEspera.add(id);
+    colaSri = colaSri.then(async () => {
+      try {
+        const datos = await d.vehiculoSri!.consultar(placa);
+        const guardado = await d.repositorio.guardarVehiculoSri!(id, placa, JSON.stringify(vehiculoSriDelPaso(placa, datos)));
+        if (guardado && datos) await difundir(id, 'deteccion:actualizada');
+      } catch (error) {
+        sriFallos.set(placa, d.tiempo.ahora().getTime());
+        if (sriFallos.size > 500) sriFallos.delete(sriFallos.keys().next().value!);
+        console.warn(`[SRI] Paso #${id} ${placa}: ${(error as Error).message}`);
+      } finally {
+        sriEnEspera.delete(id);
+      }
+    });
+  }
+
+  /** Las filas del día que se muestran también se completan (p. ej. las registradas antes de activar la consulta). */
+  function completarListadoConSri(filas: Fila[]): void {
+    const desde = d.tiempo.ahora().getTime() - 24 * 3_600_000;
+    for (const f of filas) {
+      if (f.fecha_hora_ingreso && new Date(f.fecha_hora_ingreso).getTime() >= desde) completarConSri(f);
+    }
   }
 
   /**
@@ -662,6 +731,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       const { pagina, tamano } = p.valor;
       const total = await d.repositorio.contar(f);
       const filas = await d.repositorio.pagina(f, (pagina - 1) * tamano, tamano);
+      completarListadoConSri(filas);
       return { items: filas.map(x => d.presentar(x)), total, pagina, tamano };
     },
 
@@ -674,7 +744,9 @@ export function casosDetecciones(d: DependenciasDetecciones) {
     async recientes(limite: unknown, busqueda?: unknown) {
       const texto = typeof busqueda === 'string' ? busqueda.trim() : '';
       if (texto.length > 100) throw errorValidacion('La búsqueda no puede superar 100 caracteres.');
-      return (await d.repositorio.recientes(leerLimite(limite), texto || null)).map(x => d.presentar(x));
+      const filas = await d.repositorio.recientes(leerLimite(limite), texto || null);
+      completarListadoConSri(filas);
+      return filas.map(x => d.presentar(x));
     },
 
     /** Reporte PDF de Registro de Salidas (solo registros completos con salida); queda en la auditoría. */

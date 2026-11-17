@@ -25,6 +25,16 @@ function valorCampo(d: Deteccion, campo: CampoIngreso): string {
   return d.vehiculo[campo] ?? '';
 }
 
+/** Ayuda de la celda cuyo valor vino de los datos públicos del SRI (no lo escribió nadie). */
+function ayudaSri(d: Deteccion, campo: CampoIngreso, valor: string): string | null {
+  const sri = d.vehiculo_sri;
+  if (!sri || !valor.trim()) return null;
+  const dato = campo === 'tipo_vehiculo' ? sri.tipo : campo === 'marca' ? sri.marca : campo === 'modelo' ? sri.modelo : null;
+  if (!dato || dato.trim().toUpperCase() !== valor.trim().toUpperCase()) return null;
+  const detalle = [sri.clase?.toLowerCase(), sri.anio ? `año ${sri.anio}` : null, sri.color?.toLowerCase()].filter(Boolean).join(', ');
+  return `${valor} · dato del SRI${detalle ? ` (${detalle})` : ''}`;
+}
+
 /** Una respuesta de guardado solo reemplaza su campo, conservando las demás celdas editadas. */
 export function actualizarCampoIngreso(anterior: Deteccion, actualizada: Deteccion, campo?: CampoIngreso): Deteccion {
   if (!campo) return actualizada;
@@ -131,7 +141,7 @@ export const CeldaIngreso: React.FC<{
       <input ref={input} className={`input input-celda${campo === 'cedula' ? ' cedula-input' : ''}`} aria-label={`${etiqueta} del registro ${d.id}`}
         aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : undefined}
         aria-busy={guardando || undefined} readOnly={!editable} value={valor} maxLength={regla.max} inputMode={campo === 'cedula' ? 'numeric' : undefined}
-        placeholder={campo === 'cedula' ? '10 dígitos' : etiqueta} title={valor || etiqueta} autoComplete="off" list={opciones ? `${id}-opciones` : undefined}
+        placeholder={campo === 'cedula' ? '10 dígitos' : etiqueta} title={ayudaSri(d, campo, valor) ?? (valor || etiqueta)} autoComplete="off" list={opciones ? `${id}-opciones` : undefined}
         onFocus={() => { enfocado.current = true; }}
         onChange={e => {
           if (!editable) return;

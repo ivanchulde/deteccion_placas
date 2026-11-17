@@ -39,6 +39,8 @@ export interface Deteccion {
   camara: { id: number; nombre: string; ubicacion: string } | null;
   tipo_vehiculo: string | null;
   vehiculo: { tipo: string | null; marca: string | null; modelo: string | null; color: string | null };
+  /** Datos públicos del SRI de la placa actual, consultados por el sistema (completan tipo, marca y modelo vacíos) */
+  vehiculo_sri?: { tipo: string | null; marca: string | null; modelo: string | null; clase: string | null; anio: number | null; color: string | null } | null;
   verificacion_vehiculo: 'coincide' | 'no_coincide' | 'sin_datos' | null;
   verificacion_detalle: string | null;
   alerta: { id: number; motivo: string; nivel: 'CRITICA' | 'ALTA' | 'MEDIA' } | null;

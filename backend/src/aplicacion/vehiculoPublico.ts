@@ -1,4 +1,4 @@
-import { type Actor, errorNoDisponible, errorNoEncontrado, errorValidacion, type PuertoAuditoria } from './comun';
+import { ACTOR_SISTEMA, type Actor, errorNoDisponible, errorNoEncontrado, errorValidacion, type PuertoAuditoria } from './comun';
 import { validarPlaca } from '../dominio/validacion';
 import { type DatosVehiculoPublico, placaSri } from '../dominio/vehiculoPublico';
 
@@ -38,6 +38,19 @@ export function casosVehiculoPublico(d: DependenciasVehiculoPublico) {
   const maximo = d.maxCache ?? 500;
   const cache = new Map<string, { t: number; datos: DatosVehiculoPublico | null }>();
 
+  /** Datos de una placa ya validada (null = el SRI no la tiene); la consulta externa queda auditada. */
+  async function buscar(placa: string, actor: Actor): Promise<DatosVehiculoPublico | null> {
+    const guardado = cache.get(placa);
+    if (guardado && ahora() - guardado.t < vigencia) return guardado.datos;
+    const datos = await d.proveedor.consultar(placa);
+    cache.delete(placa);
+    cache.set(placa, { t: ahora(), datos });
+    if (cache.size > maximo) cache.delete(cache.keys().next().value!);
+    await d.auditoria.operacion(actor, 'CONSULTA_VEHICULO', 'vehiculo', null,
+      `Datos públicos del vehículo · ${placaSri(placa)} · ${d.proveedor.nombre} · ${datos ? 'con datos' : 'sin datos'}`).catch(() => undefined);
+    return datos;
+  }
+
   return {
     habilitado: () => d.proveedor.habilitado,
 
@@ -45,21 +58,20 @@ export function casosVehiculoPublico(d: DependenciasVehiculoPublico) {
       const p = validarPlaca(entrada);
       if (!p.ok) throw errorValidacion(p.error);
       if (!d.proveedor.habilitado) throw errorNoDisponible(MENSAJE_DESHABILITADO_VEHICULO);
-      const placa = p.valor.placa;
-      const guardado = cache.get(placa);
-      let datos: DatosVehiculoPublico | null;
-      if (guardado && ahora() - guardado.t < vigencia) {
-        datos = guardado.datos;
-      } else {
-        datos = await d.proveedor.consultar(placa);
-        cache.delete(placa);
-        cache.set(placa, { t: ahora(), datos });
-        if (cache.size > maximo) cache.delete(cache.keys().next().value!);
-        await d.auditoria.operacion(actor, 'CONSULTA_VEHICULO', 'vehiculo', null,
-          `Datos públicos del vehículo · ${placaSri(placa)} · ${d.proveedor.nombre} · ${datos ? 'con datos' : 'sin datos'}`).catch(() => undefined);
-      }
+      const datos = await buscar(p.valor.placa, actor);
       if (!datos) throw errorNoEncontrado('El SRI no tiene datos públicos de esa placa.');
       return datos;
+    },
+
+    /**
+     * Consulta del propio sistema al leer una placa (completa la fila del registro): null si el SRI
+     * no tiene la placa; lanza si la placa no es válida, si está desactivada o si el servicio falla.
+     */
+    async porPlaca(entrada: string): Promise<DatosVehiculoPublico | null> {
+      const p = validarPlaca(entrada);
+      if (!p.ok) throw errorValidacion(p.error);
+      if (!d.proveedor.habilitado) throw errorNoDisponible(MENSAJE_DESHABILITADO_VEHICULO);
+      return buscar(p.valor.placa, ACTOR_SISTEMA);
     },
   };
 }

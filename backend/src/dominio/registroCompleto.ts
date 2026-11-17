@@ -1,3 +1,5 @@
+import { vehiculoSriVigente } from './vehiculoPublico';
+
 /** Campos de la hoja de registros; la matrícula ilegible puede ser null, igual que modelo o color. */
 export const DATOS_AUSENTES_REGISTRO = ['', '-', '—', 'desconocido', 'sin clasificar', 'sin identificar', 'unknown', 'n/a', 'sin placa'] as const;
 export function datoRegistro(...valores: unknown[]): string | null {
@@ -8,12 +10,23 @@ export function datoRegistro(...valores: unknown[]): string | null {
   }
   return null;
 }
+/**
+ * Datos de la fila. Lo escrito por el personal manda; después, el permiso de la lista blanca y, al
+ * final, los datos públicos del SRI de esa placa. En el tipo, el del SRI (clase de la matrícula)
+ * reemplaza la clasificación de la cámara salvo que una persona o el permiso lo hayan fijado
+ * (tipo_vehiculo); la observación de la cámara sigue en vehiculo_tipo para el segundo factor.
+ */
 export function datosRegistro(d: Record<string, any>) {
+  const sri = vehiculoSriVigente(d);
+  const tipoFijado = datoRegistro(d.tipo_vehiculo);
   return {
     nombre: datoRegistro(d.persona_ingreso, d.propietario),
     placa: datoRegistro(d.placa_validada, d.placa_reconocida),
-    tipo: datoRegistro(d.vehiculo_tipo, d.tipo_vehiculo, d.autorizado_tipo),
-    marca: datoRegistro(d.vehiculo_marca, d.autorizado_marca),
+    tipo: tipoFijado
+      ? datoRegistro(d.vehiculo_tipo, d.tipo_vehiculo, d.autorizado_tipo)
+      : datoRegistro(sri?.tipo, d.vehiculo_tipo, d.autorizado_tipo),
+    marca: datoRegistro(d.vehiculo_marca, d.autorizado_marca, sri?.marca),
+    modelo: datoRegistro(d.vehiculo_modelo, d.autorizado_modelo, sri?.modelo),
     // El motivo del paso o, si está vacío, el del permiso de la lista blanca
     motivo: datoRegistro(d.motivo_ingreso, d.autorizado_motivo),
   };
@@ -26,7 +39,6 @@ export function datosReporteSalida(d: Record<string, any>) {
   return {
     ...datosRegistro(d),
     cedula: d.cedula_ingreso === '' ? null : datoRegistro(d.cedula_ingreso, d.autorizado_cedula),
-    modelo: datoRegistro(d.vehiculo_modelo, d.autorizado_modelo),
   };
 }
 export function faltantesIngreso(d: Record<string, any>): string[] {

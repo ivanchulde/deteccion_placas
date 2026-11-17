@@ -258,6 +258,10 @@ ALTER TABLE "deteccionvehiculo"
   ADD COLUMN IF NOT EXISTS vigencia_desde date,
   ADD COLUMN IF NOT EXISTS vigencia_hasta date,
   ADD COLUMN IF NOT EXISTS horario_permiso varchar(600);
+-- Datos públicos del SRI de la placa del paso (JSON: placa, tipo, marca, modelo, clase, año, color),
+-- consultados por el sistema al leer la placa. Solo valen mientras el paso conserve esa placa y no
+-- reemplazan lo escrito por el personal ni lo del permiso; NULL = aún no consultado.
+ALTER TABLE "deteccionvehiculo" ADD COLUMN IF NOT EXISTS vehiculo_sri varchar(600);
 
 CREATE INDEX IF NOT EXISTS ix_usuarios_rol_estado ON "usuarios" (rol_id, estado);
 CREATE INDEX IF NOT EXISTS ix_auditoriaaccesos_email ON "auditoriaaccesos" (email, fecha DESC);

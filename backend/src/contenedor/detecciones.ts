@@ -16,6 +16,15 @@ import { pdfHistorial, pdfRegistros } from '../infraestructura/servicios/documen
 import { conservarEvidenciaListas } from '../infraestructura/servicios/evidenciaListas';
 import { LISTA_BLANCA } from '../dominio/listas';
 import { listas } from './listas';
+import { vehiculoPublico } from './vehiculoPublico';
+
+/**
+ * Consulta automática del SRI al leer una placa (tipo, marca y modelo en la fila). Se apaga con
+ * VEHICULO_PUBLICO_AUTOMATICO=false (queda solo la consulta del formulario) o con
+ * VEHICULO_PUBLICO_HABILITADO=false (ninguna placa sale del sistema).
+ */
+const sriAutomatico = vehiculoPublico.habilitado()
+  && (process.env.VEHICULO_PUBLICO_AUTOMATICO ?? 'true').trim().toLowerCase() !== 'false';
 
 /**
  * Raíz de composición de las detecciones: SQL Server, cruce con las listas, evidencia en disco,
@@ -69,6 +78,7 @@ export const detecciones = casosDetecciones({
     guardar: guardarCuadroAnpr,
     automatica: evidenciaRecienteAnpr,
   },
+  ...(sriAutomatico ? { vehiculoSri: { consultar: (placa: string) => vehiculoPublico.porPlaca(placa) } } : {}),
   eventos: eventosSocket,
   auditoria: auditoriaSql,
   tiempo: { ahora: () => new Date(), zona: ZONA_HORARIA },
