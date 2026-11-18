@@ -10,6 +10,8 @@
  * Las consultas a las listas están en infraestructura/servicios/plateMatching.ts (infraestructura).
  */
 
+import { placaAnt } from './validacion';
+
 // Grupos de caracteres que el OCR confunde con frecuencia en placas.
 const CONFUSION_GROUPS = ['0ODQ', '1IL', '8B', '5S', '2Z', '6G', '4A', '7T'];
 
@@ -51,7 +53,9 @@ export function comparePlates(leida: string, registrada: string): TipoCoincidenc
   const a = normalizePlate(leida);
   const b = normalizePlate(registrada);
   if (!a || !b) return null;
-  if (a === b) return 'exacta';
+  // Formato anterior y vigente de la ANT son la misma placa (PZX-970 = PZX-0970). Lo aproximado
+  // se mide sobre lo escrito: así un dígito perdido (PBA123 frente a PBA1234) sigue alertando
+  if (a === b || placaAnt(a) === placaAnt(b)) return 'exacta';
   if (Math.min(a.length, b.length) < 5) return null;
   if (a.length === b.length && canonicalize(a) === canonicalize(b)) return 'aproximada';
   if (Math.min(a.length, b.length) >= 6 && levenshtein(canonicalize(a), canonicalize(b)) <= 1) {

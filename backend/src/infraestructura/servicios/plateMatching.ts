@@ -1,6 +1,8 @@
 import sql, { PostgresPool } from '../postgres';
 import { evaluarVigencia } from '../../dominio/horario';
 import { hoyLocalSql, ZONA_HORARIA } from './tiempo';
+import { placaAnt } from '../../dominio/validacion';
+import { placaAntSql } from '../persistencia/placaSql';
 
 /**
  * Cruce de placas leídas por OCR contra Lista Negra y Vehículos Autorizados.
@@ -51,13 +53,18 @@ export async function findBlacklistMatch(db: PostgresPool, placa: string): Promi
 export async function findPermisoExacto(db: PostgresPool, placa: string): Promise<any | null> {
   const clean = normalizePlate(placa);
   if (!clean) return null;
+  // Formato anterior y vigente de la ANT son la misma placa (PZX-970 = PZX-0970); si están las dos
+  // escritas, gana la que coincide tal cual se leyó
   const result = await db.request()
-    .input('placa', sql.VarChar(20), clean)
+    .input('placa', sql.VarChar(20), placaAnt(clean))
+    .input('leida', sql.VarChar(20), clean)
     .query(`
-      SELECT TOP 1 id, placa, propietario, departamento, tipo_vehiculo, marca, modelo, color,
+      SELECT id, placa, propietario, departamento, tipo_vehiculo, marca, modelo, color,
              categoria, fecha_inicio, fecha_vencimiento, horario, registrado_por
       FROM ListaBlanca
-      WHERE activo = 1 AND REPLACE(REPLACE(placa, '-', ''), ' ', '') = @placa
+      WHERE activo = 1 AND ${placaAntSql('placa')} = @placa
+      ORDER BY CASE WHEN REPLACE(REPLACE(placa, '-', ''), ' ', '') = @leida THEN 0 ELSE 1 END, id
+      LIMIT 1
     `);
   return result.recordset[0] ?? null;
 }

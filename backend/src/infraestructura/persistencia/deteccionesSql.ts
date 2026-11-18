@@ -170,13 +170,14 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
     const r = await db().request()
       .input('tid', sql.Int, trackingId)
       .input('placa', sql.VarChar(20), pista)
+      .input('placa_ant', sql.VarChar(20), placaAnt(pista))
       .input('camara', sql.Int, camaraId)
       .input('movimiento', sql.VarChar(10), tipoMovimiento)
       .input('ventana', sql.Int, VENTANA_MISMO_PASO_S * 1000)
       .query(`
         SELECT TOP 1 id, fecha_hora_ingreso FROM DeteccionVehiculo
         WHERE ((LEN(@placa) < 4 AND tracking_id = @tid AND @tid > 0)
-               OR (LEN(@placa) >= 4 AND REPLACE(REPLACE(COALESCE(placa_reconocida, ''), '-', ''), ' ', '') = @placa))
+               OR (LEN(@placa) >= 4 AND ${placaAntSql('placa_reconocida')} = @placa_ant))
           AND ((camara_id = @camara) OR (camara_id IS NULL AND @camara IS NULL))
           AND tipo_movimiento = @movimiento
           AND estado_procesamiento IN ('pendiente_ocr', 'procesado')
@@ -420,14 +421,14 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
   async pasoProcesadoConPlaca(idExcluido, placa, camaraId, tipoMovimiento) {
     const r = await db().request()
       .input('id', sql.Int, idExcluido)
-      .input('placa', sql.VarChar(20), placa)
+      .input('placa', sql.VarChar(20), placaAnt(placa))
       .input('camara', sql.Int, camaraId)
       .input('movimiento', sql.VarChar(10), tipoMovimiento)
       .input('ventana', sql.Int, VENTANA_MISMO_PASO_S * 1000)
       .query(`
         SELECT TOP 1 id FROM DeteccionVehiculo
         WHERE id <> @id AND estado_procesamiento = 'procesado'
-          AND REPLACE(REPLACE(COALESCE(placa_reconocida, ''), '-', ''), ' ', '') = @placa
+          AND ${placaAntSql('placa_reconocida')} = @placa
           AND ((camara_id = @camara) OR (camara_id IS NULL AND @camara IS NULL))
           AND tipo_movimiento = @movimiento
           AND fecha_hora_ingreso > DATEADD(MILLISECOND, -@ventana, GETDATE())
@@ -609,10 +610,10 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
   },
 
   async ingresoAbiertoPorPlaca(placa) {
-    const r = await db().request().input('placa', sql.VarChar(22), placa).query(`
+    const r = await db().request().input('placa', sql.VarChar(22), placaAnt(placa)).query(`
       SELECT d.id
       FROM DeteccionVehiculo d
-      WHERE UPPER(${PLACA_D}) = @placa
+      WHERE ${placaAntSql('COALESCE(d.placa_validada, d.placa_reconocida)')} = @placa
         AND COALESCE(d.tipo_movimiento, 'ingreso') = 'ingreso'
         AND d.fecha_hora_salida IS NULL
       ORDER BY d.fecha_hora_ingreso DESC, d.id DESC
@@ -690,14 +691,14 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
     // Una matrícula ausente no identifica un vehículo: nunca emparejar ingresos por null o vacío.
     if (typeof placa !== 'string' || !placa.trim()) return null;
     const r = await db().request()
-      .input('salida', sql.Int, salidaId).input('placa', sql.VarChar(20), placa).input('minimo', sql.Int, minimoSegundos)
+      .input('salida', sql.Int, salidaId).input('placa', sql.VarChar(20), placaAnt(placa)).input('minimo', sql.Int, minimoSegundos)
       .query(`
         UPDATE DeteccionVehiculo d
         SET fecha_hora_salida = s.fecha_hora_ingreso, salida_deteccion_id = s.id
         FROM DeteccionVehiculo s
         WHERE s.id = @salida AND d.id = (
           SELECT i.id FROM DeteccionVehiculo i
-          WHERE REPLACE(COALESCE(i.placa_validada, i.placa_reconocida, ''), '-', '') = @placa
+          WHERE ${placaAntSql('COALESCE(i.placa_validada, i.placa_reconocida)')} = @placa
             AND i.tipo_movimiento = 'ingreso' AND i.fecha_hora_salida IS NULL
             AND i.fecha_hora_ingreso <= s.fecha_hora_ingreso - make_interval(secs => @minimo)
             ${soloIngresoConfirmado ? 'AND (i.lectura_valida IS TRUE OR i.validado_manualmente IS TRUE)' : ''}
@@ -800,10 +801,12 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
     return r.recordset[0].id;
   },
 
-  async camaraIngresoUnica() {
+  async camarasIngresoAnalizadas() {
+    // Las que están en línea primero: si dos empatan en la evidencia, gana la que sí transmite
     const r = await db().request().query(`
-      SELECT id FROM Camaras WHERE activa = TRUE AND analisis_anpr = TRUE AND direccion = 'ingreso' ORDER BY id LIMIT 2`);
-    return r.recordset.length === 1 ? Number(r.recordset[0].id) : null;
+      SELECT id FROM Camaras WHERE activa = TRUE AND analisis_anpr = TRUE AND direccion = 'ingreso'
+      ORDER BY (estado = 'EN_LINEA') DESC, id LIMIT 4`);
+    return r.recordset.map(f => Number(f.id));
   },
 
   async eliminar(id) {

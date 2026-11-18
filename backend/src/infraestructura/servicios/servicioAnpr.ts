@@ -151,7 +151,7 @@ export async function guardarCuadroAnpr(camaraId: number, t: number): Promise<st
  * `segundos` y el vehículo en ese momento. null si ningún motor analiza la cámara o no respondió.
  */
 export async function evidenciaRecienteAnpr(camaraId: number, segundos: number): Promise<{
-  rutaVehiculo: string | null; rutaPlaca: string | null; placaLeida: string | null; haceS: number | null;
+  rutaVehiculo: string | null; rutaPlaca: string | null; placaLeida: string | null; haceS: number | null; anchoPlacaPx: number | null;
 } | null> {
   try {
     const indice = await indiceDeCamara(camaraId);
@@ -162,6 +162,7 @@ export async function evidenciaRecienteAnpr(camaraId: number, segundos: number):
       rutaPlaca: typeof r.ruta_placa === 'string' ? r.ruta_placa : null,
       placaLeida: typeof r.placa_leida === 'string' ? r.placa_leida : null,
       haceS: typeof r.hace_s === 'number' ? r.hace_s : null,
+      anchoPlacaPx: typeof r.ancho_placa_px === 'number' ? r.ancho_placa_px : null,
     };
   } catch {
     return null;

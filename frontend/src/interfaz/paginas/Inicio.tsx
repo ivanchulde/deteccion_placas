@@ -141,7 +141,8 @@ const PanelOperador: React.FC = () => {
   useEffect(() => {
     if (!confirmacion) return;
     const cerrar = () => setConfirmacion(null);
-    const temporizador = window.setTimeout(cerrar, 7000);
+    // Con el detalle de lo completado y la foto, más tiempo para leerlo (cualquier tecla lo cierra)
+    const temporizador = window.setTimeout(cerrar, confirmacion.texto.length > 90 ? 12000 : 7000);
     window.addEventListener('keydown', cerrar);
     return () => {
       window.clearTimeout(temporizador);
@@ -153,10 +154,13 @@ const PanelOperador: React.FC = () => {
     if (!identificadorValido || registrando) return;
     setRegistrando(true);
     try {
-      const { data } = await api.post<{ movimiento: 'entrada' | 'salida'; deteccion: Deteccion }>(
-        '/detecciones/movimiento-placa',
-        { identificador },
-      );
+      const { data } = await api.post<{
+        movimiento: 'entrada' | 'salida'; deteccion: Deteccion;
+        /** «desde …» cuando el sistema completó datos de la placa o la cédula */
+        autollenado?: string | null;
+        /** Cámara de la que salieron las fotos automáticas y la placa que leyó */
+        foto?: { camara_id: number; placa_leida: string | null; leyo_la_placa: boolean } | null;
+      }>('/detecciones/movimiento-placa', { identificador });
       const d = data.deteccion;
       const persona = d.persona_ingreso?.trim() || d.autorizado?.propietario || d.datos_permiso?.propietario;
       if (data.movimiento === 'salida') {
@@ -166,10 +170,17 @@ const PanelOperador: React.FC = () => {
           texto: `El usuario ${persona || 'registrado'} registró su salida vehicular con éxito${d.placa ? ` (${formatearPlaca(d.placa)})` : ''}.`,
         });
       } else {
+        // Qué completó el sistema solo, para que el guardia lo confirme
+        const detalles = [
+          data.autollenado ? `Datos completados ${data.autollenado}: confírmelos con el documento.` : '',
+          data.foto ? `Foto tomada de la cámara ${d.camara?.nombre ?? data.foto.camara_id}.` : 'Sin foto: ninguna cámara de ingreso entregó imagen.',
+          !d.placa && data.foto?.placa_leida ? `La cámara leyó ${formatearPlaca(data.foto.placa_leida)}: si es su vehículo, corrija la placa en Registro de Ingresos.` : '',
+          !d.placa && !data.foto?.placa_leida ? 'Ingreso sin placa: complétela en Registro de Ingresos.' : '',
+        ].filter(Boolean).join(' ');
         setConfirmacion({
           tipo: 'exito',
           titulo: `¡Bienvenido ${persona || 'usuario'}!`,
-          texto: 'Su registro de ingreso vehicular ha sido registrado con éxito.',
+          texto: `Su registro de ingreso vehicular ha sido registrado con éxito. ${detalles}`.trim(),
         });
       }
       setIdentificador('');
@@ -205,7 +216,7 @@ const PanelOperador: React.FC = () => {
                 placeholder="ABC1234 o 0123456789"
                 onChange={e => setIdentificador(e.target.value.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase().slice(0, 10))}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void registrarMovimientoInteligente(); } }} />
-              <small><kbd>Enter</kbd> registra entrada o salida. Si una cédula tiene varias placas o vehículos dentro, use la placa para elegir.</small>
+              <small><kbd>Enter</kbd> registra entrada o salida y completa los datos que el sistema conoce, con la foto de la cámara. Si una cédula tiene varias placas o vehículos dentro, use la placa para elegir.</small>
             </div>
             <button className="btn guardia-movimiento" onClick={() => void registrarMovimientoInteligente()}
               disabled={!identificadorValido || registrando}>

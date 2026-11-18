@@ -2,7 +2,8 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import type { Pool, PoolClient } from 'pg';
-import { normalizarPlaca, validarPlaca } from '../../dominio/validacion';
+import { normalizarPlaca, placaAnt, validarPlaca } from '../../dominio/validacion';
+import { placaAntSql } from '../persistencia/placaSql';
 import { archivoDe, DIRECTORIO_EVIDENCIA_LISTAS, DIRECTORIOS_MEDIA } from './media';
 
 type Fila = Record<string, any>;
@@ -13,7 +14,8 @@ const LISTAS = [
   { tabla: 'listablanca', lista: 'autorizado' as Lista },
   { tabla: 'listanegra', lista: 'lista_negra' as Lista },
 ];
-const PLACA_SQL = "UPPER(REPLACE(REPLACE(placa, '-', ''), ' ', ''))";
+/** Placa de la lista en la forma vigente de la ANT (PZX-970 = PZX-0970), igual que placaAnt. */
+const PLACA_SQL = placaAntSql('placa');
 
 /** Copia propia de la lista: borrar el acceso nunca borra la evidencia conservada. */
 async function copiar(ruta: unknown, nombre: string, directorios: string[], directorioDestino: string): Promise<string | null> {
@@ -70,7 +72,7 @@ export async function conservarEvidenciaListas(base: Base, fila: Fila, opciones:
       await conexion.query('BEGIN');
       const registros = await conexion.query(`SELECT id, ruta_evidencia_vehiculo, ruta_evidencia_placa
         FROM ${tabla} WHERE activo = TRUE AND ${PLACA_SQL} = $1
-        AND (ruta_evidencia_vehiculo IS NULL OR ruta_evidencia_placa IS NULL) FOR UPDATE`, [placa]);
+        AND (ruta_evidencia_vehiculo IS NULL OR ruta_evidencia_placa IS NULL) FOR UPDATE`, [placaAnt(placa)]);
       for (const registro of registros.rows) {
         const prefijo = `lista_${lista}_${registro.id}_${crypto.randomUUID()}`;
         const imagenVehiculo = !registro.ruta_evidencia_vehiculo && vehiculo
@@ -105,8 +107,8 @@ export async function recuperarEvidenciasListas(base: Base, alGuardar?: (lista: 
       AND (d.lectura_valida = TRUE OR d.validado_manualmente = TRUE)
       AND (d.ruta_imagen_ingreso IS NOT NULL OR d.ruta_imagen_placa IS NOT NULL)
       AND (${LISTAS.map(({ tabla }) => `EXISTS (SELECT 1 FROM ${tabla} t
-        WHERE t.activo = TRUE AND UPPER(REPLACE(REPLACE(t.placa, '-', ''), ' ', '')) =
-          UPPER(REPLACE(REPLACE(COALESCE(d.placa_validada, d.placa_reconocida), '-', ''), ' ', ''))
+        WHERE t.activo = TRUE AND ${placaAntSql('t.placa')} =
+          ${placaAntSql('COALESCE(d.placa_validada, d.placa_reconocida)')}
           AND (t.ruta_evidencia_vehiculo IS NULL OR t.ruta_evidencia_placa IS NULL))`).join(' OR ')})
     ORDER BY d.fecha_hora_ingreso ASC, d.id ASC`);
   for (const fila of r.rows) await conservarEvidenciaListas(base, fila, { alGuardar });

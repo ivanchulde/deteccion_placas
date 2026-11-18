@@ -350,6 +350,11 @@ protegido o bórrelo del servidor: contiene datos personales (LOPDP).
 Los permisos nuevos se registran desde la interfaz (**Lista blanca** o **Gestión de Permisos**), que
 también permite importarlos desde un archivo Excel (`.xlsx`) o `.csv`.
 
+Las placas de automóvil del formato anterior de la ANT (3 dígitos, `ABC-123`) y su forma vigente
+con un 0 delante (`ABC-0123`) son el mismo vehículo: el sistema las cruza igual con las listas, las
+salidas y los reportes, así que el permiso se puede registrar en cualquiera de las dos formas. Si la
+lista ya tiene las dos como permisos distintos, al editarlos el sistema avisa que la placa ya existe.
+
 ### 6.1 Nombres por cédula (catastro del RUC, opcional)
 
 Al escribir una cédula en un formulario o en la celda **Cédula** de la tabla de ingresos, el sistema

@@ -3,6 +3,7 @@ import { getDB } from '../db';
 import type { RepositorioNotificaciones } from '../../aplicacion/notificaciones';
 import { mapearNotificacion, reconocer } from '../servicios/notificaciones';
 import { hashEndpoint } from '../servicios/webPush';
+import { placaAntSql } from './placaSql';
 
 /** Repositorio SQL Server de la bandeja (Notificaciones, NotificacionUsuario) y de las suscripciones push. */
 
@@ -19,8 +20,7 @@ const VISIBLE_PARA_ROL = `(
     SELECT 1 FROM ListaBlanca permiso JOIN DeteccionVehiculo paso ON paso.id = n.deteccion_id
     WHERE permiso.registrado_por = @uid
       AND (permiso.id = paso.vehiculo_autorizado_id
-        OR REGEXP_REPLACE(UPPER(COALESCE(permiso.placa, '')), '[^A-Z0-9]', '', 'g')
-          = REGEXP_REPLACE(UPPER(COALESCE(paso.placa_validada, paso.placa_reconocida, '')), '[^A-Z0-9]', '', 'g'))
+        OR ${placaAntSql('permiso.placa')} = ${placaAntSql('COALESCE(paso.placa_validada, paso.placa_reconocida)')})
   ))
 )`;
 

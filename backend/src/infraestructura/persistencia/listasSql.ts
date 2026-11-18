@@ -6,11 +6,14 @@ import type { RegistroListaDTO, RepositorioListas } from '../../aplicacion/lista
 import { config } from '../servicios/configuracion';
 import { hoyLocalSql } from '../servicios/tiempo';
 import { urlMedia } from '../servicios/media';
+import { placaAnt } from '../../dominio/validacion';
+import { placaAntSql } from './placaSql';
 
 /** Repositorio PostgreSQL de las listas de control (tablas ListaBlanca y ListaNegra). */
 
 const TABLA: Record<TipoLista, 'ListaBlanca' | 'ListaNegra'> = { autorizados: 'ListaBlanca', alertas: 'ListaNegra' };
-const MISMA_PLACA = "REPLACE(REPLACE(placa, '-', ''), ' ', '') = @placa";
+/** Misma placa aunque una esté en el formato anterior de la ANT (PZX-970 = PZX-0970); @placa pasa por placaAnt. */
+const MISMA_PLACA = `${placaAntSql('placa')} = @placa`;
 
 const columnasDe = (def: DefinicionLista) => [...def.campos.map(c => c.nombre), ...(def.temporal ? ['fecha_inicio', 'horario'] : [])];
 const valorDe = (c: string) => (c === 'fecha_inicio' ? '@inicio' : `@${c}`);
@@ -77,13 +80,13 @@ export const repositorioListasSql: RepositorioListas = {
   },
 
   async buscarPorPlaca(def, placa) {
-    const r = await db().request().input('placa', sql.VarChar(10), placa)
+    const r = await db().request().input('placa', sql.VarChar(10), placaAnt(placa))
       .query(`SELECT id, activo, registrado_por FROM ${TABLA[def.tipo]} WHERE ${MISMA_PLACA}`);
     return r.recordset[0] ? { id: r.recordset[0].id, activo: Boolean(r.recordset[0].activo), registrado_por: r.recordset[0].registrado_por } : null;
   },
 
   async existeOtraConPlaca(def, placa, idExcluido) {
-    const r = await db().request().input('placa', sql.VarChar(10), placa).input('id', sql.Int, idExcluido)
+    const r = await db().request().input('placa', sql.VarChar(10), placaAnt(placa)).input('id', sql.Int, idExcluido)
       .query(`SELECT TOP 1 id FROM ${TABLA[def.tipo]} WHERE ${MISMA_PLACA} AND id <> @id`);
     return r.recordset.length > 0;
   },

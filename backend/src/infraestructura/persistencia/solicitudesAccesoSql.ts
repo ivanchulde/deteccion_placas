@@ -3,6 +3,7 @@ import { getDB } from '../db';
 import { describirHorario, leerHorario } from '../../dominio/horario';
 import type { DatosSolicitud } from '../../dominio/solicitudesAcceso';
 import type { RepositorioSolicitudes, SolicitudDTO } from '../../aplicacion/solicitudesAcceso';
+import { placaAntSql } from './placaSql';
 
 /** Repositorio SQL Server de las solicitudes de acceso (tabla SolicitudesAcceso). */
 
@@ -10,9 +11,9 @@ const SELECT = `
   SELECT s.*, us.nombre_completo AS solicitante_nombre, us.email AS solicitante_email,
          ur.nombre_completo AS resolutor_nombre,
          CAST(CASE WHEN EXISTS (SELECT 1 FROM ListaNegra l WHERE l.activo = 1
-              AND REPLACE(REPLACE(l.placa, '-', ''), ' ', '') = s.placa) THEN 1 ELSE 0 END AS BIT) AS en_lista_alertas,
+              AND ${placaAntSql('l.placa')} = ${placaAntSql('s.placa')}) THEN 1 ELSE 0 END AS BIT) AS en_lista_alertas,
          (SELECT TOP 1 v.id FROM ListaBlanca v WHERE v.activo = 1
-              AND REPLACE(REPLACE(v.placa, '-', ''), ' ', '') = s.placa) AS permiso_actual_id
+              AND ${placaAntSql('v.placa')} = ${placaAntSql('s.placa')}) AS permiso_actual_id
   FROM SolicitudesAcceso s
   JOIN Usuarios us ON us.id = s.solicitado_por
   LEFT JOIN Usuarios ur ON ur.id = s.resuelto_por`;

@@ -8,6 +8,7 @@ import { ACCIONES_SENSIBLES } from '../../dominio/reportes';
 import type { EstadoValidacion } from '../../dominio/decisionAcceso';
 import { hoyLocalSql } from '../servicios/tiempo';
 import { urlMedia } from '../servicios/media';
+import { placaAntSql } from './placaSql';
 
 /**
  * Consultas de los reportes (aplicacion/reportes.ts) en PostgreSQL: vehículos que más ingresan,
@@ -104,8 +105,8 @@ async function fichas(ids: unknown[]): Promise<Map<number, FilaPaso>> {
 
 /** Situación actual de una placa (sin guion) en las listas. */
 const situacionSql = (placa: string) => `CASE
-  WHEN EXISTS (SELECT 1 FROM ListaNegra n WHERE n.activo IS TRUE AND REPLACE(n.placa, '-', '') = ${placa}) THEN 'Lista negra'
-  WHEN EXISTS (SELECT 1 FROM ListaBlanca b WHERE b.activo IS TRUE AND REPLACE(b.placa, '-', '') = ${placa}) THEN 'Lista blanca'
+  WHEN EXISTS (SELECT 1 FROM ListaNegra n WHERE n.activo IS TRUE AND ${placaAntSql('n.placa')} = ${placaAntSql(placa)}) THEN 'Lista negra'
+  WHEN EXISTS (SELECT 1 FROM ListaBlanca b WHERE b.activo IS TRUE AND ${placaAntSql('b.placa')} = ${placaAntSql(placa)}) THEN 'Lista blanca'
   ELSE 'Sin permiso' END`;
 
 const SITUACION: Record<string, string> = { blanca: 'Lista blanca', sin_permiso: 'Sin permiso', negra: 'Lista negra' };

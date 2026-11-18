@@ -48,6 +48,18 @@ const DESDE_ORIGEN: Record<OrigenPersona, string> = {
   permiso_anterior: 'desde un permiso anterior', catastro_sri: 'desde el catastro público del RUC (SRI)',
 };
 
+/** Completa en `destino` lo que no trae con `extra`, sin reemplazar nada; true si agregó algo. */
+function completarDatosIngreso(destino: DatosIngreso, extra: DatosIngreso): boolean {
+  let agregado = false;
+  for (const k of ['cedula', 'persona', 'motivo', 'tipo', 'marca', 'modelo', 'color'] as const) {
+    if (destino[k] === undefined && extra[k] !== undefined && extra[k] !== null) { destino[k] = extra[k]; agregado = true; }
+  }
+  for (const [k, v] of Object.entries(extra.ficha ?? {}) as [keyof FichaIngreso, unknown][]) {
+    if (v !== undefined && v !== null && destino.ficha?.[k] === undefined) { destino.ficha = { ...destino.ficha, [k]: v }; agregado = true; }
+  }
+  return agregado;
+}
+
 /** 'AAAA-MM-DD' de una columna DATE leída como instante local (node-postgres la entrega a medianoche). */
 const diaCalendario = (v: Date) => `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
 
@@ -199,8 +211,8 @@ export interface RepositorioDetecciones {
   crearManual(d: { placa: string | null; camaraId: number | null; tipo: string | null; marca: string | null; usuarioId: number; rutaImagen?: string; rutaImagenPlaca?: string },
     cruce: Cruce, decision: Decision): Promise<number>;
   crearSalidaManual(d: { placa: string | null; camaraId: number; usuarioId: number; rutaImagen?: string; rutaImagenPlaca?: string }): Promise<number>;
-  /** La única cámara de ingreso habilitada que analiza el motor (null si no hay o hay varias) */
-  camaraIngresoUnica?(): Promise<number | null>;
+  /** Cámaras de ingreso habilitadas que analiza el motor, primero las que están en línea (hasta 4) */
+  camarasIngresoAnalizadas?(): Promise<number[]>;
   /** Nombres y apellidos de quien ingresa y motivo de ingreso (solo los campos presentes) */
   guardarDatosIngreso(id: number, d: DatosIngreso): Promise<void>;
   /**
@@ -243,6 +255,20 @@ export interface EvidenciaAutomatica {
   /** Placa que el motor leyó en esa pista, si la leyó */
   placaLeida: string | null;
   haceS: number | null;
+  /** Ancho en píxeles de la placa elegida (más ancha = más legible); null sin placa vista */
+  anchoPlacaPx?: number | null;
+}
+
+/**
+ * Datos que el sistema completa solo en un registro manual (dashboard del guardia): lo que ya
+ * conoce de la placa o de la cédula. `desde` es el texto para la auditoría y el aviso
+ * («desde un ingreso anterior de la placa»); con `soloSinPermiso` no se usa si la placa tiene
+ * permiso vigente (el permiso ya trae sus datos).
+ */
+export interface AutollenadoManual {
+  datos: DatosIngreso;
+  desde: string;
+  soloSinPermiso?: boolean;
 }
 
 /** Encabezado del reporte PDF de Registro de Salidas. */
@@ -400,6 +426,82 @@ export function casosDetecciones(d: DependenciasDetecciones) {
   }
 
   /**
+   * Fotos automáticas del registro manual: pide a cada cámara lo mejor de sus últimos `segundos` y
+   * se queda con una: la que leyó la placa registrada; si ninguna, la que vio la placa más ancha
+   * (más legible); si ninguna vio placa, el cuadro más reciente de la primera (en línea primero).
+   * Borra las fotos que el motor guardó de las demás. Una cámara que falla no impide las otras.
+   */
+  async function mejorEvidencia(camaras: number[], segundos: number, placa: string | null) {
+    const respuestas = await Promise.all(camaras.slice(0, 4).map(async camara => ({
+      camara, ev: await d.evidenciaManual!.automatica!(camara, segundos).catch(() => null),
+    })));
+    const utiles = respuestas.filter((r): r is { camara: number; ev: EvidenciaAutomatica } => Boolean(r.ev && (r.ev.rutaVehiculo || r.ev.rutaPlaca)));
+    if (!utiles.length) return null;
+    const leyoLaPlaca = (ev: EvidenciaAutomatica) => Boolean(placa && ev.placaLeida && placaAnt(ev.placaLeida) === placaAnt(placa));
+    const puntaje = ({ ev }: { ev: EvidenciaAutomatica }) => [leyoLaPlaca(ev) ? 1 : 0, ev.rutaPlaca ? 1 : 0, ev.anchoPlacaPx ?? 0, -(ev.haceS ?? 999)];
+    // Orden estable: a igual puntaje gana la cámara que vino primero (las en línea)
+    const ordenadas = [...utiles].sort((a, b) => {
+      const pa = puntaje(a); const pb = puntaje(b);
+      for (let i = 0; i < pa.length; i++) if (pa[i] !== pb[i]) return pb[i] - pa[i];
+      return 0;
+    });
+    const [mejor, ...resto] = ordenadas;
+    const sobrantes = resto.flatMap(r => [r.ev.rutaVehiculo, r.ev.rutaPlaca]).filter(Boolean);
+    if (sobrantes.length) await d.evidencia.eliminar(sobrantes).catch(() => 0);
+    return { ...mejor, leyoLaPlaca: leyoLaPlaca(mejor.ev) };
+  }
+
+  /** Solo los datos que pasan las mismas reglas del formulario (un dato viejo inválido se omite). */
+  function datosValidos(candidatos: Record<string, unknown>, ficha: Record<'institucion' | 'cargo' | 'departamento', unknown> | null): DatosIngreso {
+    const salida: DatosIngreso = {};
+    for (const [campo, valor] of Object.entries(candidatos)) {
+      if (valor === null || valor === undefined || !String(valor).trim()) continue;
+      const r = leerDatosIngreso({ [campo]: valor });
+      if (!r.ok) continue;
+      for (const [k, v] of Object.entries(r.valor)) if (v !== null && v !== undefined) (salida as Record<string, unknown>)[k] = v;
+    }
+    const largos = { institucion: 150, cargo: 150, departamento: 100 } as const;
+    const f: Partial<FichaIngreso> = {};
+    for (const campo of Object.keys(largos) as (keyof typeof largos)[]) {
+      const v = validarTexto(ficha?.[campo], { etiqueta: campo, tipo: 'alfanumerico', max: largos[campo] });
+      if (v.ok && v.valor) f[campo] = v.valor;
+    }
+    if (Object.keys(f).length) salida.ficha = f;
+    return salida;
+  }
+
+  /**
+   * Lo que el sistema sabe de una placa sin permiso: la persona y el vehículo de su última visita
+   * registrada (la misma regla del formulario «Registrar ingreso», frontend datosPlacaConocida).
+   */
+  async function autollenadoPorPlaca(placa: string): Promise<AutollenadoManual | null> {
+    const previo = (await d.repositorio.historialPlaca(placa)).find(f => f.tipo_movimiento !== 'salida' && datoRegistro(f.persona_ingreso, f.propietario));
+    if (!previo) return null;
+    const datos = datosValidos({
+      persona_ingreso: datoRegistro(previo.persona_ingreso, previo.propietario),
+      cedula: datoRegistro(previo.cedula_ingreso, previo.autorizado_cedula),
+      motivo_ingreso: datoRegistro(previo.motivo_ingreso, previo.autorizado_motivo),
+      tipo_vehiculo: datoRegistro(previo.tipo_vehiculo, previo.vehiculo_tipo, previo.autorizado_tipo),
+      marca: datoRegistro(previo.vehiculo_marca, previo.autorizado_marca),
+      modelo: datoRegistro(previo.vehiculo_modelo, previo.autorizado_modelo),
+      color: datoRegistro(previo.vehiculo_color),
+    }, {
+      institucion: datoRegistro(previo.institucion_ingreso, previo.autorizado_institucion),
+      cargo: datoRegistro(previo.cargo_ingreso, previo.autorizado_cargo),
+      departamento: datoRegistro(previo.departamento_ingreso, previo.departamento),
+    });
+    return datos.persona ? { datos, desde: `desde el ingreso anterior de la placa (${fechaHoraLocal(previo.fecha_hora_ingreso)})`, soloSinPermiso: true } : null;
+  }
+
+  /** Lo que el sistema sabe de una cédula sin permiso vigente (registros propios o catastro del RUC). */
+  async function autollenadoPorCedula(cedula: string): Promise<AutollenadoManual> {
+    const p = await d.repositorio.personaPorCedula(cedula).catch(() => null);
+    const datos = datosValidos({ cedula, persona_ingreso: p?.propietario },
+      p ? { institucion: p.institucion, cargo: p.cargo, departamento: p.departamento } : null);
+    return { datos, desde: datos.persona && p ? DESDE_ORIGEN[p.origen as OrigenPersona] ?? 'desde los registros de la cédula' : 'con la cédula' };
+  }
+
+  /**
    * Cédula escrita en la fila (celda de la tabla): si el ingreso no tiene titular ni lo trae su
    * permiso, se completa con lo que el sistema tiene de esa cédula o, si no, con el catastro del RUC
    * importado; también institución, cargo y departamento que nunca se escribieron. Nunca reemplaza
@@ -441,7 +543,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       const previo = await d.repositorio.ingresoCerradoPor(id);
       if (previo) {
         // Sigue valiendo con la misma placa si una de las dos lecturas está confirmada (la misma regla que al cerrar)
-        if (placa && previo.placa === placa && (confirmada || previo.confirmado)) return;
+        if (placa && placaAnt(previo.placa) === placaAnt(placa) && (confirmada || previo.confirmado)) return;
         await reabrirCierre(id, previo.id, previo.placa);
       }
       const { activa, minimoSegundos } = d.salidaAutomatica();
@@ -710,7 +812,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       // Una alerta o confirmación manual mantiene su decisión; una foto tardía de la misma
       // matrícula sí puede completar la evidencia que todavía falta en su registro de lista.
       if ((rutaPlaca || typeof lectura_valida === 'boolean')
-        && placa === normalizarPlaca(actual.placa_validada || actual.placa_reconocida) && lectura_valida !== false) {
+        && placaAnt(placa) === placaAnt(actual.placa_validada || actual.placa_reconocida) && lectura_valida !== false) {
         try { await d.evidenciaListas?.conservar({ ...actual, ruta_imagen_placa: rutaPlaca ?? actual.ruta_imagen_placa,
           evidencia_lectura: evidencia_lectura ?? actual.evidencia_lectura,
           lectura_valida: typeof lectura_valida === 'boolean' ? lectura_valida : actual.lectura_valida }); }
@@ -1002,7 +1104,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       return d.evidenciaManual.cuadros(id.valor);
     },
 
-    async registroManual(entrada: unknown, actor: Actor, permisoEsperadoId?: number) {
+    async registroManual(entrada: unknown, actor: Actor, permisoEsperadoId?: number, autollenado?: AutollenadoManual | null) {
       const r = leerRegistroManual(cuerpo(entrada));
       if (!r.ok) throw errorValidacion(r.error);
       const { placa, motivo, camaraId, tipoVehiculo, marca, cuadroT, ficha } = r.valor;
@@ -1016,9 +1118,10 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       let rutaImagen: string | null = null;
       let rutaImagenPlaca: string | null = null;
       let notaFoto = '';
-      // Cámara del registro: la elegida o, en un ingreso sin cámara, la única de ingreso (la evidencia
-      // automática sale de ella y el registro queda asociado a ella)
+      // Cámara del registro: la elegida o, en un ingreso sin cámara, la de ingreso de la que salió la
+      // evidencia automática (el registro queda asociado a ella)
       let camaraRegistro = camaraId;
+      let foto: { camara_id: number; placa_leida: string | null; leyo_la_placa: boolean } | null = null;
       if (cuadroT !== null && camaraId !== null) {
         rutaImagen = d.evidenciaManual ? await d.evidenciaManual.guardar(camaraId, cuadroT) : null;
         if (!rutaImagen) throw errorValidacion('La foto elegida ya no está en los últimos 30 s de la cámara. Elija otra o registre sin foto.');
@@ -1026,17 +1129,18 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       } else {
         // Sin foto elegida: la cámara aporta sola la placa más legible de los últimos segundos y el
         // vehículo en ese momento. Una falla del motor no impide registrar el paso.
+        // Sin cámara elegida, todas las de ingreso que analiza el motor (antes solo si había una única)
         const segundos = d.segundosEvidenciaManual?.() ?? 0;
         const hayAutomatica = segundos > 0 && Boolean(d.evidenciaManual?.automatica);
-        const camara = camaraId ?? (hayAutomatica ? await d.repositorio.camaraIngresoUnica?.() ?? null : null);
-        const ev = hayAutomatica && camara !== null
-          ? await d.evidenciaManual!.automatica!(camara, segundos).catch(() => null)
-          : null;
-        if (ev && (ev.rutaVehiculo || ev.rutaPlaca)) {
+        const camaras = !hayAutomatica ? [] : camaraId !== null ? [camaraId] : await d.repositorio.camarasIngresoAnalizadas?.().catch(() => []) ?? [];
+        const elegida = camaras.length ? await mejorEvidencia(camaras, segundos, placa) : null;
+        if (elegida) {
+          const { ev, camara } = elegida;
           rutaImagen = ev.rutaVehiculo;
           rutaImagenPlaca = ev.rutaPlaca;
           camaraRegistro = camara;
-          notaFoto = ` · fotos automáticas de la cámara (${ev.rutaPlaca ? 'placa y vehículo' : 'vehículo, sin placa visible'}`
+          foto = { camara_id: camara, placa_leida: ev.placaLeida, leyo_la_placa: elegida.leyoLaPlaca };
+          notaFoto = ` · fotos automáticas de la cámara ${camara} (${ev.rutaPlaca ? 'placa y vehículo' : 'vehículo, sin placa visible'}`
             + `${ev.placaLeida ? `; la cámara leyó ${ev.placaLeida}` : ''})`;
         }
       }
@@ -1055,16 +1159,20 @@ export function casosDetecciones(d: DependenciasDetecciones) {
         throw errorConflicto('El permiso asociado a la cédula no coincide de forma única con la placa. Verifique la lista blanca antes de registrar el ingreso.');
       }
       const decision = decidirAcceso({ origen: 'manual', ...entradaListas(cruce), politica: d.politica() });
+      // Datos conocidos de la placa o la cédula: solo completan lo que el registro no trae
+      const completado = autollenado && !(autollenado.soloSinPermiso && cruce.permiso)
+        ? completarDatosIngreso(ingreso.valor, autollenado.datos) : false;
       const id = await d.repositorio.crearManual({
         placa, camaraId: camaraRegistro, tipo: ingreso.valor.tipo || tipoVehiculo || cruce.permiso?.tipo_vehiculo || null,
         marca: ingreso.valor.marca ?? marca, usuarioId: actor.id, ...conFoto,
       }, cruce, decision);
       if (hayDatosIngreso(ingreso.valor)) await d.repositorio.guardarDatosIngreso(id, ingreso.valor);
       await d.auditoria.operacion(actor, 'REGISTRO_MANUAL', 'deteccion', id,
-        `${placa} (${ETIQUETA_ESTADO[decision.estado]}) · ${motivo}${describirDatosIngreso(ingreso.valor)}${notaFoto}`);
+        `${placa ?? 'sin placa'} (${ETIQUETA_ESTADO[decision.estado]}) · ${motivo}${describirDatosIngreso(ingreso.valor)}`
+        + `${completado ? ` · datos completados ${autollenado!.desde}` : ''}${notaFoto}`);
       const dto = await difundir(id, 'deteccion:nueva');
       await avisarSiCorresponde(dto, decision, cruce.permiso);
-      return { message: 'Ingreso registrado manualmente.', deteccion: dto };
+      return { message: 'Ingreso registrado manualmente.', deteccion: dto, autollenado: completado ? autollenado!.desde : null, foto };
     },
 
     /**
@@ -1259,7 +1367,16 @@ export function casosDetecciones(d: DependenciasDetecciones) {
         }
 
         const permisos = await d.repositorio.permisosActivosPorCedula(valor);
-        if (permisos.length === 0) throw errorNoEncontrado('No existe un permiso activo en la lista blanca para esa cédula.');
+        if (permisos.length === 0) {
+          // Sin permiso vigente: ingreso por revisar con la persona que el sistema conoce (registros
+          // propios o catastro del RUC) y las fotos de la cámara. La placa la confirma el guardia en la
+          // tabla: la que lea la cámara no se asigna sola porque decidiría el acceso de otro vehículo.
+          return {
+            ...(await this.registroManual({ motivo: 'Ingreso manual por cédula desde el dashboard del guardia' },
+              actor, undefined, await autollenadoPorCedula(valor))),
+            movimiento: 'entrada' as const,
+          };
+        }
         if (permisos.length > 1) throw errorConflicto('La cédula está asociada a varias placas. Ingrese la placa específica para registrar el ingreso.');
         const permiso = permisos[0];
         const placaPermiso = validarPlaca(permiso.placa);
@@ -1291,11 +1408,12 @@ export function casosDetecciones(d: DependenciasDetecciones) {
         };
       }
 
+      // Con permiso, sus datos llegan por el vínculo; sin permiso, los de la última visita de la placa
       return {
         ...(await this.registroManual({
           placa: placa.valor.placa,
           motivo: 'Ingreso manual desde el dashboard del guardia',
-        }, actor)),
+        }, actor, undefined, await autollenadoPorPlaca(placa.valor.placa).catch(() => null))),
         movimiento: 'entrada' as const,
       };
     },
