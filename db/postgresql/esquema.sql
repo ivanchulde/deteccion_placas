@@ -262,6 +262,15 @@ ALTER TABLE "deteccionvehiculo"
 -- consultados por el sistema al leer la placa. Solo valen mientras el paso conserve esa placa y no
 -- reemplazan lo escrito por el personal ni lo del permiso; NULL = aún no consultado.
 ALTER TABLE "deteccionvehiculo" ADD COLUMN IF NOT EXISTS vehiculo_sri varchar(600);
+-- Catastro del RUC que el SRI publica como datos abiertos (descargas.sri.gob.ec/download/datosAbiertos),
+-- reducido a personas naturales: cédula y nombre (razón social, APELLIDOS NOMBRES). Sirve para
+-- completar el titular por cédula sin consultar servicios externos. Lo llena
+-- dist/infraestructura/herramientas/importarCatastroRuc.js; vacía = el autollenado usa solo los registros propios.
+CREATE TABLE IF NOT EXISTS "catastroruc" (
+  cedula varchar(10) PRIMARY KEY,
+  nombre varchar(150) NOT NULL,
+  fecha_corte date
+);
 
 CREATE INDEX IF NOT EXISTS ix_usuarios_rol_estado ON "usuarios" (rol_id, estado);
 CREATE INDEX IF NOT EXISTS ix_auditoriaaccesos_email ON "auditoriaaccesos" (email, fecha DESC);

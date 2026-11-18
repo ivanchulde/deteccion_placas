@@ -5,6 +5,7 @@ import { useAuth } from '../../aplicacion/AuthContext';
 import { useEvento, useReconexion } from '../../aplicacion/tiempoReal';
 import { fechaHora, hora, iniciales } from '../../dominio/formato';
 import { Confirmar } from './ui';
+import { enMayusculas } from './campos';
 
 /** Aviso de Socket.IO: se eliminó la conversación entre `usuarios` (por uno de ellos, `por`). */
 interface ConversacionEliminada { usuarios: number[]; por: number }
@@ -232,7 +233,7 @@ const PanelMensajes: React.FC<{ yo: number; onCerrar: () => void; onCambio: () =
         <>
           <div className="msj-buscar">
             <div className="input-icono"><Search size={15} />
-              <input className="input" value={busqueda} onChange={e => setBusqueda(e.target.value)} maxLength={80}
+              <input className="input" value={busqueda} {...enMayusculas(setBusqueda)} maxLength={80}
                 placeholder="Buscar persona…" aria-label="Buscar contacto" />
             </div>
           </div>

@@ -634,7 +634,8 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
   },
 
   async personaPorCedula(cedula) {
-    // Orden: permiso vigente, último ingreso con esa cédula, última solicitud y permiso anterior.
+    // Orden: permiso vigente, último ingreso con esa cédula, última solicitud, permiso anterior y, al
+    // final, el catastro público del RUC (solo nombre; ver infraestructura/herramientas/importarCatastroRuc.ts).
     // En el ingreso, lo que nunca se escribió (NULL) se toma del permiso con que entró; '' fue vaciado a propósito.
     const r = await db().request().input('cedula', sql.VarChar(10), cedula).query(`
       SELECT origen, fecha, propietario, institucion, cargo, departamento FROM (
@@ -653,6 +654,9 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
         UNION ALL
         SELECT 4, 'permiso_anterior', NULL::timestamp, id, propietario, institucion, cargo, departamento
         FROM ListaBlanca WHERE cedula = @cedula AND activo IS NOT TRUE
+        UNION ALL
+        SELECT 5, 'catastro_sri', fecha_corte::timestamp, 0, nombre, NULL, NULL, NULL
+        FROM catastroruc WHERE cedula = @cedula
       ) x
       WHERE NULLIF(TRIM(propietario), '') IS NOT NULL
       ORDER BY prioridad, fecha DESC NULLS LAST, orden DESC

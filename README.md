@@ -15,6 +15,7 @@ solo lo necesario para compilar y poner en marcha el sistema con Docker Compose 
 4. [Comprobar que el sistema está en marcha](#4-comprobar-que-el-sistema-está-en-marcha)
 5. [Primer uso](#5-primer-uso)
 6. [Cargar la lista blanca](#6-cargar-la-lista-blanca)
+   - [6.1 Nombres por cédula (catastro del RUC, opcional)](#61-nombres-por-cédula-catastro-del-ruc-opcional)
 7. [Operación diaria](#7-operación-diaria)
 8. [Servidor sin internet](#8-servidor-sin-internet)
 9. [Solución de problemas](#9-solución-de-problemas)
@@ -83,6 +84,9 @@ gratuito; Docker Desktop exige una suscripción paga en organizaciones grandes (
   registro. Envía solo la placa, no datos del propietario. Sin internet, esos campos se llenan a
   mano. Para que solo consulten los formularios: `VEHICULO_PUBLICO_AUTOMATICO=false`; para
   apagarla del todo: `VEHICULO_PUBLICO_HABILITADO=false` en el `.env`.
+- Si importa el catastro del RUC ([6.1](#61-nombres-por-cédula-catastro-del-ruc-opcional)), el
+  servidor descarga una vez sus archivos de `descargas.sri.gob.ec`; buscar una cédula después no
+  sale a internet.
 - Puertos que deben quedar abiertos hacia la red del personal:
 
 | Puerto | Protocolo | Uso |
@@ -346,6 +350,34 @@ protegido o bórrelo del servidor: contiene datos personales (LOPDP).
 Los permisos nuevos se registran desde la interfaz (**Lista blanca** o **Gestión de Permisos**), que
 también permite importarlos desde un archivo Excel (`.xlsx`) o `.csv`.
 
+### 6.1 Nombres por cédula (catastro del RUC, opcional)
+
+Al escribir una cédula en un formulario o en la celda **Cédula** de la tabla de ingresos, el sistema
+completa el nombre con lo que ya tiene registrado (permiso, ingresos anteriores o solicitudes). Para
+completar también el de personas que nunca se registraron, importe el catastro del RUC que el SRI
+publica como [datos abiertos](https://descargas.sri.gob.ec/download/datosAbiertos/):
+
+```bash
+# Todo el país: 2,9 GB de descarga, unos 9 minutos y ~710 MB en la base (6,1 millones de personas)
+docker compose -f docker-compose.prod.yml exec backend node dist/infraestructura/herramientas/importarCatastroRuc.js todas
+
+# O solo algunas provincias
+docker compose -f docker-compose.prod.yml exec backend node dist/infraestructura/herramientas/importarCatastroRuc.js Tungurahua Pichincha
+```
+
+- Solo se guardan las personas naturales, y de ellas solo la cédula y el nombre como lo registra el
+  SRI (APELLIDOS NOMBRES). La búsqueda es local: ninguna cédula sale del servidor.
+- Cubre a quienes tienen RUC: con la lista blanca del ECU 911 encontró 125 de 237 cédulas (53 %).
+  Los demás se escriben a mano.
+- El nombre completado se marca para que el guardia lo confirme con el documento, y la auditoría
+  anota de dónde salió.
+- El corte publicado al momento es del 06-01-2025. Repetir el comando cuando el SRI publique uno
+  nuevo actualiza los nombres.
+- Para quitarlo (el autollenado vuelve a usar solo los registros propios):
+  `... importarCatastroRuc.js --vaciar`.
+- Son datos personales de una fuente pública: confirme su uso con el responsable de protección de
+  datos de la institución (LOPDP).
+
 ---
 
 ## 7. Operación diaria
@@ -370,7 +402,7 @@ docker compose -f docker-compose.prod.yml restart anpr
 
 ```bash
 mkdir respaldos                 # solo la primera vez
-docker compose -f docker-compose.prod.yml exec db sh -c 'pg_dump -U $POSTGRES_USER -d $POSTGRES_DB -Fc -f /tmp/respaldo.dump'
+docker compose -f docker-compose.prod.yml exec db sh -c 'pg_dump -U $POSTGRES_USER -d $POSTGRES_DB -Fc --exclude-table-data=catastroruc -f /tmp/respaldo.dump'
 ```
 
 Copie el respaldo con la fecha del día:
@@ -389,7 +421,8 @@ docker compose -f docker-compose.prod.yml cp db:/tmp/respaldo.dump "respaldos/AN
 docker compose -f docker-compose.prod.yml exec db rm /tmp/respaldo.dump
 ```
 
-Guarde los respaldos fuera del servidor. Contienen datos personales.
+Guarde los respaldos fuera del servidor. Contienen datos personales. El catastro del RUC
+([6.1](#61-nombres-por-cédula-catastro-del-ruc-opcional)) no se copia porque se puede volver a importar.
 
 ### Restaurar un respaldo
 
@@ -402,6 +435,8 @@ docker compose -f docker-compose.prod.yml exec db sh -c 'pg_restore --clean --if
 docker compose -f docker-compose.prod.yml exec db rm /tmp/respaldo.dump
 docker compose -f docker-compose.prod.yml start backend anpr frontend
 ```
+
+Si usaba el catastro del RUC, vuelva a importarlo después de restaurar ([6.1](#61-nombres-por-cédula-catastro-del-ruc-opcional)).
 
 ### Actualizar a una versión nueva
 
@@ -430,6 +465,15 @@ El paquete trae las 5 imágenes ya compiladas, el compose, los scripts `instalar
 `instalar.ps1` (Windows) y su propio `LEEME_DESPLIEGUE.txt` con los pasos. Tras instalar, cargue la
 lista blanca como en la [sección 6](#6-cargar-la-lista-blanca), usando `docker compose` sin
 `-f docker-compose.prod.yml` (el paquete trae un `docker-compose.yml`).
+
+Para el catastro del RUC ([6.1](#61-nombres-por-cédula-catastro-del-ruc-opcional)), descargue en el otro
+equipo los archivos `SRI_RUC_<Provincia>.csv` de las provincias que necesite, cópielos al servidor y
+cárguelos uno por uno:
+
+```bash
+docker compose cp SRI_RUC_Tungurahua.csv backend:/tmp/
+docker compose exec backend node dist/infraestructura/herramientas/importarCatastroRuc.js --archivo /tmp/SRI_RUC_Tungurahua.csv
+```
 
 ---
 

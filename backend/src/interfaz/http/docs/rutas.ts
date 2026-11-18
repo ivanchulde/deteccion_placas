@@ -594,8 +594,9 @@ export const RUTAS: RutaDoc[] = [
     metodo: 'get', ruta: '/api/detecciones/buscar-cedula/:cedula', etiqueta: 'Detecciones',
     acceso: { algunoDe: ['detecciones:validar', 'padron:agregar', 'padron:gestionar', 'solicitudes:crear', 'alertas:restringir'] },
     resumen: 'Datos de la persona registrados con una cédula (autollenado)',
-    descripcion: 'Nombre, institución, cargo y departamento de su permiso vigente, su último ingreso, su última solicitud o un permiso anterior, en ese orden. '
-      + 'Solo datos del propio sistema: la cédula no sale a ningún servicio externo. Sin registros responde persona: null.',
+    descripcion: 'Nombre, institución, cargo y departamento de su permiso vigente, su último ingreso, su última solicitud o un permiso anterior, en ese orden; '
+      + 'si no hay ninguno, solo el nombre del catastro del RUC importado de los datos abiertos del SRI (origen catastro_sri). '
+      + 'Todo es local: la cédula no sale a ningún servicio externo. Sin registros responde persona: null.',
     respuestas: { 400: 'La cédula no tiene 10 dígitos' },
   },
   {
@@ -674,7 +675,8 @@ export const RUTAS: RutaDoc[] = [
   {
     metodo: 'patch', ruta: '/api/detecciones/:id(\\d+)/ingreso', etiqueta: 'Detecciones', acceso: 'detecciones:validar',
     resumen: 'Edita titular y datos del vehículo de un ingreso',
-    descripcion: 'Permite actualizar solo los campos enviados; un campo ausente no cambia y vacío lo borra. Solo en ingresos; queda en la auditoría.',
+    descripcion: 'Permite actualizar solo los campos enviados; un campo ausente no cambia y vacío lo borra. Solo en ingresos; queda en la auditoría. '
+      + 'Si llega una cédula sin titular y el ingreso no tiene titular, se completa como en GET /buscar-cedula (titular_autollenado indica de dónde salió).',
     cuerpo: {
       persona_ingreso: { tipo: 'string', descripcion: 'Letras, espacios y . \' - &, hasta 150 caracteres', ejemplo: 'Sbte. María Cevallos' },
       motivo_ingreso: { tipo: 'string', descripcion: 'Texto libre sin < >, hasta 300 caracteres', ejemplo: 'Compras públicas' },

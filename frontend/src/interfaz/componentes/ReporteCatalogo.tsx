@@ -15,6 +15,7 @@ import { Aviso, Cargando, Tarjeta } from './ui';
 import { Informe, ResumenInforme } from './InformeImprimible';
 import { PeriodoCompacto } from './PeriodoCompacto';
 import { useNotificar } from './Notificaciones';
+import { enMayusculas } from './campos';
 
 /**
  * Un reporte del servidor (GET /reportes/catalogo/:tipo): el formulario se arma con los parámetros
@@ -240,7 +241,8 @@ const Formulario: React.FC<{
                   <input id={id} className="input" value={valores[p.clave] ?? ''} inputMode={p.tipo === 'entero' ? 'numeric' : undefined}
                     type={p.tipo === 'entero' ? 'number' : 'text'} min={p.min} max={p.max} maxLength={p.tipo === 'texto' ? p.max : undefined}
                     placeholder={p.ayuda && p.tipo === 'texto' ? p.ayuda : undefined} title={p.ayuda} autoComplete="off"
-                    onChange={e => cambiar(p.clave, e.target.value, true)} /></div>;
+                    {...(p.tipo === 'entero' ? { onChange: (e: React.ChangeEvent<HTMLInputElement>) => cambiar(p.clave, e.target.value, true) }
+                      : enMayusculas(v => cambiar(p.clave, v, true)))} /></div>;
               })}
             </div>
           </fieldset>

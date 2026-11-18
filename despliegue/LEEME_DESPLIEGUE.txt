@@ -228,7 +228,7 @@ Datos ........... el paquete NO trae datos: ni base de datos, ni cámaras, ni
  Base de datos (archivo portable):
 
    mkdir -p respaldos
-   docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+   docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc --exclude-table-data=catastroruc' \
      > respaldos/ANPR_$(date +%F).dump
 
  Fotografías de evidencia (pasos y listas):

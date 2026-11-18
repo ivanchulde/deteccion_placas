@@ -10,6 +10,7 @@ import { fecha, fechaHora, fechaIsoLocal, hora, numero } from '../../dominio/for
 import { descargarBlob } from '../../infraestructura/descargas';
 import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { FilasEsqueleto, Kpi, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
+import { enMayusculas } from '../componentes/campos';
 
 /**
  * Lista de Permisos de la garita: cada permiso que otorgó un gestor de permisos (servicios
@@ -117,7 +118,7 @@ const ListaPermisos: React.FC = () => {
           <div className="filtros" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
             <div className="campo crece" style={{ maxWidth: 380 }}>
               <div className="input-icono"><Search size={15} />
-                <input className="input" value={busqueda} onChange={e => setBusqueda(e.target.value)} maxLength={100}
+                <input className="input" value={busqueda} {...enMayusculas(setBusqueda)} maxLength={100}
                   placeholder="Nombre, cédula, placa, institución, motivo…" aria-label="Buscar permiso" />
               </div>
             </div>

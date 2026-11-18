@@ -20,6 +20,7 @@ import { ConfianzaRegistro } from '../componentes/ConfianzaRegistro';
 import { PeriodoCompacto } from '../componentes/PeriodoCompacto';
 import { VisorZoom } from '../componentes/ZoomDual';
 import { useNotificar } from '../componentes/Notificaciones';
+import { enMayusculas } from '../componentes/campos';
 
 /**
  * Historial completo: todos los pasos registrados (autorizados, no autorizados, lista negra,
@@ -302,7 +303,7 @@ const HistorialCompleto: React.FC = () => {
             <div className="campo historial-buscar">
               <label htmlFor="h-buscar">Buscar</label>
               <div className="input-icono"><Search size={15} />
-                <input id="h-buscar" className="input" value={texto} onChange={e => setTexto(e.target.value)} maxLength={100}
+                <input id="h-buscar" className="input" value={texto} {...enMayusculas(setTexto)} maxLength={100}
                   placeholder="Placa, nombres y apellidos o cédula" autoComplete="off" aria-describedby="h-buscar-ayuda"
                   title="Cada palabra, en cualquier orden y sin tildes: «perez maria» encuentra a «María José Pérez López»" />
                 {texto && <button type="button" className="input-limpiar" aria-label="Borrar la búsqueda" onClick={() => setTexto('')}><X size={14} /></button>}

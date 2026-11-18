@@ -85,6 +85,20 @@ export function filtrarEscrito(el: Control, limpiar: (v: string) => string): str
   return limpio;
 }
 
+/**
+ * Buscadores y celdas de texto: lo escrito pasa a mayúsculas, como en los formularios (CampoTexto).
+ * Durante una composición (tilde con tecla muerta, teclado del celular) se deja tal cual y se
+ * convierte al terminarla. `limpiar` quita antes los caracteres que el campo no admite.
+ */
+export function enMayusculas(onCambiar: (valor: string) => void, limpiar: (v: string) => string = v => v) {
+  const transformar = (v: string) => limpiar(v).toUpperCase();
+  return {
+    onChange: (e: React.ChangeEvent<Control>) => onCambiar(componiendo(e) ? e.target.value : filtrarEscrito(e.target, transformar)),
+    onCompositionEnd: (e: React.CompositionEvent<Control>) => onCambiar(filtrarEscrito(e.currentTarget, transformar)),
+    autoCapitalize: 'characters' as const,
+  };
+}
+
 /** Posición del cursor después del carácter significativo número `n` del texto formateado. */
 function posicionTras(texto: string, n: number): number {
   if (n <= 0) return 0;

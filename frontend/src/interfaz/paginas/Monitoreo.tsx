@@ -24,6 +24,7 @@ import { VistaCuadricula } from '../componentes/VistaCuadricula';
 import { actualizarCampoIngreso, CeldaIngreso, type CampoIngreso } from '../componentes/CeldaIngreso';
 import { ConfianzaRegistro } from '../componentes/ConfianzaRegistro';
 import { horasDelMovimiento } from '../../dominio/movimiento';
+import { enMayusculas } from '../componentes/campos';
 
 const MAX_FEED = 30;
 const CLAVE_PERFIL = 'anpr_perfil_video';
@@ -569,7 +570,7 @@ export const TablaIngresosRecientes: React.FC<{
           <option value="dentro">Autorizados sin salida</option>
         </select>
         <input ref={refConsulta} className="input" style={{ height: 32, width: 220 }} value={texto} maxLength={100} placeholder="Placa, vehículo o titular"
-          onChange={e => setTexto(e.target.value)}
+          {...enMayusculas(setTexto)}
           aria-label="Buscar por placa, vehículo o titular" autoComplete="off" spellCheck={false} />
         {consultando && <span className="texto-secundario" role="status">Buscando…</span>}
         <button type="button" className="btn btn-secondary btn-sm" onClick={onRegistrar}><ClipboardPlus size={14} /> Registrar</button>

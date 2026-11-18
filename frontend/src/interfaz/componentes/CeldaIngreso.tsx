@@ -46,8 +46,14 @@ export function actualizarCampoIngreso(anterior: Deteccion, actualizada: Detecci
     validado_manualmente: actualizada.validado_manualmente,
     restriccion_acceso: actualizada.restriccion_acceso,
   };
-  if (campo === 'cedula') cambios.datos_permiso = { ...anterior.datos_permiso, cedula: actualizada.datos_permiso?.cedula ?? '' };
-  else if (campo === 'persona_ingreso') {
+  if (campo === 'cedula') {
+    cambios.datos_permiso = { ...anterior.datos_permiso, cedula: actualizada.datos_permiso?.cedula ?? '' };
+    // La cédula en una fila sin titular lo completa en el servidor (registros propios o catastro del RUC)
+    if (!(anterior.persona_ingreso ?? anterior.autorizado?.propietario) && actualizada.persona_ingreso) {
+      cambios.persona_ingreso = actualizada.persona_ingreso;
+      cambios.datos_permiso.propietario = actualizada.persona_ingreso;
+    }
+  } else if (campo === 'persona_ingreso') {
     cambios.persona_ingreso = actualizada.persona_ingreso;
     cambios.datos_permiso = { ...anterior.datos_permiso, propietario: actualizada.persona_ingreso ?? '' };
   } else if (campo === 'motivo_ingreso') cambios.motivo_ingreso = actualizada.motivo_ingreso;
@@ -69,6 +75,7 @@ export const CeldaIngreso: React.FC<{
   const [valor, setValor] = useState(recibido);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const borrador = useRef(recibido);
@@ -113,7 +120,13 @@ export const CeldaIngreso: React.FC<{
     setGuardando(true);
     setError(null);
     try {
-      const { data } = await api.patch<{ deteccion: Deteccion }>(`/detecciones/${d.id}/ingreso`, { [campo]: nuevo });
+      const { data } = await api.patch<{ deteccion: Deteccion; titular_autollenado?: string | null }>(`/detecciones/${d.id}/ingreso`, { [campo]: nuevo });
+      if (data.titular_autollenado) {
+        setAviso(data.titular_autollenado === 'catastro_sri'
+          ? 'Titular completado con el catastro del RUC (SRI): confírmelo con su documento.'
+          : 'Titular completado con los registros de esta cédula: confírmelo con su documento.');
+        window.setTimeout(() => setAviso(null), 8000);
+      }
       const guardado = valorCampo(data.deteccion, campo);
       persistido.current = guardado;
       if (borrador.current.trim().replace(/\s+/g, ' ') === nuevo) {
@@ -135,6 +148,16 @@ export const CeldaIngreso: React.FC<{
     }
   };
 
+  /** Lo escrito, filtrado por la regla del campo y en mayúsculas (la cédula, solo dígitos). */
+  const escribir = (el: HTMLInputElement) => {
+    if (!editable) return;
+    const nuevo = filtrarEscrito(el, v => campo === 'cedula' ? soloDigitos(v) : filtrarTexto(v, regla.tipo).toUpperCase());
+    borrador.current = nuevo;
+    modificado.current = nuevo !== persistido.current;
+    setValor(nuevo);
+    setError(null);
+  };
+
   return <td className={`celda-ingreso${campo === 'persona_ingreso' ? ' celda-titular' : ''}`}
     onClick={e => { e.stopPropagation(); if (editable) input.current?.focus(); }} onKeyDown={e => e.stopPropagation()}>
     <>
@@ -143,14 +166,13 @@ export const CeldaIngreso: React.FC<{
         aria-busy={guardando || undefined} readOnly={!editable} value={valor} maxLength={regla.max} inputMode={campo === 'cedula' ? 'numeric' : undefined}
         placeholder={campo === 'cedula' ? '10 dígitos' : etiqueta} title={ayudaSri(d, campo, valor) ?? (valor || etiqueta)} autoComplete="off" list={opciones ? `${id}-opciones` : undefined}
         onFocus={() => { enfocado.current = true; }}
+        autoCapitalize={campo === 'cedula' ? undefined : 'characters'}
         onChange={e => {
-          if (!editable) return;
-          const nuevo = filtrarEscrito(e.target, v => campo === 'cedula' ? soloDigitos(v) : filtrarTexto(v, regla.tipo));
-          borrador.current = nuevo;
-          modificado.current = nuevo !== persistido.current;
-          setValor(nuevo);
-          setError(null);
+          // Una tilde a medio componer (tecla muerta) se convierte al terminar la composición
+          if ((e.nativeEvent as InputEvent).isComposing) { if (editable) setValor(e.target.value); return; }
+          escribir(e.target);
         }}
+        onCompositionEnd={e => escribir(e.currentTarget)}
         onBlur={() => { enfocado.current = false; void guardar(); }}
         onKeyDown={e => {
           e.stopPropagation();
@@ -169,6 +191,7 @@ export const CeldaIngreso: React.FC<{
       {opciones && <datalist id={`${id}-opciones`}>{opciones.map(v => <option key={v} value={v} />)}</datalist>}
       {error && <span className="error error-celda" id={`${id}-error`} role="alert">{error}</span>}
       {guardando && <span className="estado-celda" role="status">Guardando…</span>}
+      {aviso && !guardando && !error && <span className="estado-celda aviso-celda" role="status">{aviso}</span>}
     </>
   </td>;
 };

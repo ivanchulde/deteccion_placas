@@ -10,7 +10,7 @@ import { fechaHora, iniciales, relativo, ROLES } from '../../dominio/formato';
 import { errorCorreoInstitucional, errorDe, sinErrores, validarTexto } from '../../dominio/validacion';
 import { REGLA_MOTIVO_BAJA, REGLAS_USUARIO } from '../../dominio/reglas';
 import { Confirmar, FilasEsqueleto, Kpi, Modal, Tarjeta, Vacio } from '../componentes/ui';
-import { CampoTexto } from '../componentes/campos';
+import { CampoTexto, enMayusculas } from '../componentes/campos';
 import { useNotificar } from '../componentes/Notificaciones';
 import { DESCRIPCION_ROL, ROLES_ORDEN } from '../../dominio/permisos';
 import type { Rol } from '../../dominio/permisos';
@@ -296,7 +296,7 @@ const Usuarios: React.FC = () => {
           </>} sinPadding>
           <div className="filtros" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
             <div className="campo crece" style={{ maxWidth: 360 }}>
-              <div className="input-icono"><Search size={15} /><input className="input" value={busqueda} onChange={e => setBusqueda(e.target.value)} maxLength={100} placeholder="Nombre, correo o cargo" aria-label="Buscar usuario" /></div>
+              <div className="input-icono"><Search size={15} /><input className="input" value={busqueda} {...enMayusculas(setBusqueda)} maxLength={100} placeholder="Nombre, correo o cargo" aria-label="Buscar usuario" /></div>
             </div>
             <select className="select" style={{ width: 'auto' }} value={rol} onChange={e => setRol(e.target.value)} aria-label="Rol">
               <option value="">Todos los roles</option>{Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

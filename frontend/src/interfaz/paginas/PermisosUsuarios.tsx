@@ -14,6 +14,7 @@ import { ImportarPermisos } from '../componentes/ImportarPermisos';
 import { useNotificar } from '../componentes/Notificaciones';
 import { RegistradoPor } from '../componentes/RegistradoPor';
 import { AccionesPermiso, estadoPermiso, useAccionesPermiso } from '../componentes/AccionesPermiso';
+import { enMayusculas } from '../componentes/campos';
 
 /** Respuesta de GET /vehiculos-autorizados/registro. */
 interface RegistroPermisos {
@@ -146,7 +147,7 @@ const PermisosUsuarios: React.FC = () => {
             <div className="campo crece" style={{ maxWidth: 380 }}>
               <label htmlFor="pu-buscar">Buscar</label>
               <div className="input-icono"><Search size={15} />
-                <input id="pu-buscar" className="input" value={busqueda} onChange={e => setBusqueda(e.target.value)} maxLength={100} placeholder="Nombre, cédula, placa, institución…" />
+                <input id="pu-buscar" className="input" value={busqueda} {...enMayusculas(setBusqueda)} maxLength={100} placeholder="Nombre, cédula, placa, institución…" />
               </div>
             </div>
             <Segmentado<Estado> valor={estado} onCambiar={v => cambiar('estado', v === 'todos' ? '' : v)} opciones={[

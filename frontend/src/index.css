@@ -893,9 +893,14 @@ a.kpi:hover, button.kpi:hover { border-color: var(--kpi-color, var(--border-stro
 .input.input-celda:focus { background: var(--surface); border-color: var(--accent-blue); box-shadow: 0 0 0 1px var(--accent-blue); }
 .input.input-celda[aria-invalid="true"] { border-color: var(--alerta); }
 .input.input-celda[readonly] { cursor: default; background: transparent; }
+/* Los datos de la fila se ven en mayúsculas, como se escriben (la ayuda del campo vacío, no) */
+.input.input-celda { text-transform: uppercase; }
+.input.input-celda::placeholder { text-transform: none; }
 .cedula-input { font-variant-numeric: tabular-nums; }
 .error-celda, .estado-celda { display: block; margin-top: 4px; font-size: 11px; white-space: normal; }
 .estado-celda { color: var(--text-3); }
+/* Titular completado por la cédula: aviso breve para confirmarlo con el documento */
+.estado-celda.aviso-celda { color: var(--accent-blue); font-weight: 600; min-width: 150px; }
 
 .tabla-registros .celda-titular { min-width: 0; max-width: none; }
 .tabla-registros .placa-foto { display: flex; width: 100%; min-width: 0; max-width: 100%; }

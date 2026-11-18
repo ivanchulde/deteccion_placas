@@ -60,7 +60,8 @@ const columnas = (fuente: FuenteAuditoria) => {
 function filtrar(f: FiltrosAuditoria): { where: string; peticion: () => PostgresRequest } {
   const { busqueda, fecha } = TABLAS[f.fuente];
   const condiciones = ['1 = 1'];
-  if (f.q) condiciones.push(`(${busqueda.map(c => `${c} LIKE @q`).join(' OR ')})`);
+  // Sin distinguir mayúsculas: el buscador escribe en mayúsculas y los correos se guardan en minúsculas
+  if (f.q) condiciones.push(`(${busqueda.map(c => `${c} ILIKE @q`).join(' OR ')})`);
   if (f.desde) condiciones.push(`${fecha} >= @desde`);
   if (f.hasta) condiciones.push(`${fecha} <= @hasta`);
   if (f.fuente === 'accesos' && f.exito !== null) condiciones.push(`exito IS ${f.exito ? 'TRUE' : 'FALSE'}`);

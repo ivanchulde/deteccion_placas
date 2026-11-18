@@ -17,6 +17,7 @@ import { CeldaEvidenciaLista } from '../componentes/EvidenciaLista';
 import { ImportarPermisos } from '../componentes/ImportarPermisos';
 import { RegistradoPor } from '../componentes/RegistradoPor';
 import { AccionesPermiso, useAccionesPermiso } from '../componentes/AccionesPermiso';
+import { enMayusculas } from '../componentes/campos';
 
 type Vigencia = 'todas' | 'vigentes' | 'por_vencer' | 'vencidas';
 /** Estado de «Mis permisos» (valores de la API: retirados = desactivados). */
@@ -146,7 +147,7 @@ const Listas: React.FC<{ tipo?: TipoLista; incrustada?: boolean; soloMios?: bool
           <div className="filtros" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
             <div className="campo crece" style={{ maxWidth: 380 }}>
               <div className="input-icono"><Search size={15} />
-                <input className="input" value={busqueda} onChange={e => setBusqueda(e.target.value)} maxLength={100} placeholder={tipo === 'autorizados' ? 'Nombre, cédula, institución, placa…' : 'Placa, motivo, marca…'} aria-label="Buscar" />
+                <input className="input" value={busqueda} {...enMayusculas(setBusqueda)} maxLength={100} placeholder={tipo === 'autorizados' ? 'Nombre, cédula, institución, placa…' : 'Placa, motivo, marca…'} aria-label="Buscar" />
               </div>
             </div>
             <Segmentado<Vigencia> valor={vigencia} onCambiar={setVigencia} opciones={[

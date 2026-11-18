@@ -11,6 +11,7 @@ import { descargarBlob } from '../../infraestructura/descargas';
 import { Aviso, FilasEsqueleto, InsigniaEstado, Paginacion, Tarjeta, Vacio } from './ui';
 import { PeriodoCompacto } from './PeriodoCompacto';
 import './ReportesRegistros.css';
+import { enMayusculas } from './campos';
 
 const TAMANO = 50;
 const MAX_PDF = 5000;
@@ -124,7 +125,7 @@ export const ReportesRegistros: React.FC = () => {
         <legend className="solo-lectores">Filtros de los registros del reporte</legend>
         <div className="campo reporte-lista-buscar"><label htmlFor="rl-buscar">Buscar registros</label>
           <div className="input-icono"><Search size={15} /><input id="rl-buscar" className="input" value={buscarEscrito} maxLength={100}
-            placeholder="Placa, nombres, cédula, motivo o vehículo" autoComplete="off" onChange={e => cambiar({ buscar: e.target.value || undefined })} />
+            placeholder="Placa, nombres, cédula, motivo o vehículo" autoComplete="off" {...enMayusculas(v => cambiar({ buscar: v || undefined }))} />
             {buscarEscrito && <button type="button" className="input-limpiar" aria-label="Borrar búsqueda" onClick={() => cambiar({ buscar: undefined })}><X size={14} /></button>}
           </div>
         </div>
@@ -149,7 +150,7 @@ export const ReportesRegistros: React.FC = () => {
           <div className="campo"><label htmlFor="rl-placa">Placa exacta</label><input id="rl-placa" className="input placa-input" value={placa} maxLength={20}
             placeholder="ABC-1234" autoComplete="off" onChange={e => cambiar({ placa: normalizarPlaca(e.target.value) || undefined })} /></div>
           <div className="campo"><label htmlFor="rl-persona">Persona o cédula</label><input id="rl-persona" className="input" value={persona} maxLength={100}
-            placeholder="Nombres, apellidos o cédula" autoComplete="off" onChange={e => cambiar({ persona: e.target.value || undefined })} /></div>
+            placeholder="Nombres, apellidos o cédula" autoComplete="off" {...enMayusculas(v => cambiar({ persona: v || undefined }))} /></div>
           <div className="campo"><label htmlFor="rl-movimiento">Movimiento</label>
             <select id="rl-movimiento" className="select" value={movimiento} onChange={e => cambiar({ movimiento: e.target.value || undefined,
               ...(e.target.value === 'salida' ? { cerrados: undefined, ...(estado && estado !== 'salidas' ? { estado: undefined } : {}) } : {}),

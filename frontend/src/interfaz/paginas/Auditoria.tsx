@@ -10,7 +10,7 @@ import { descargarBlob } from '../../infraestructura/descargas';
 import { validarEntero } from '../../dominio/validacion';
 import { LARGO_BUSQUEDA, RETENCION_AUDITORIA } from '../../dominio/reglas';
 import { Cargando, Confirmar, FilasEsqueleto, Modal, Paginacion, Pestanas, Tarjeta, Vacio } from '../componentes/ui';
-import { CampoEntero } from '../componentes/campos';
+import { CampoEntero, enMayusculas } from '../componentes/campos';
 import { useNotificar } from '../componentes/Notificaciones';
 
 /**
@@ -233,7 +233,7 @@ const Auditoria: React.FC = () => {
         <Tarjeta>
           <div className="filtros">
             <div className="campo crece"><label htmlFor="a-q">Buscar</label>
-              <div className="input-icono"><Search size={15} /><input id="a-q" className="input" value={texto} onChange={e => setTexto(e.target.value)}
+              <div className="input-icono"><Search size={15} /><input id="a-q" className="input" value={texto} {...enMayusculas(setTexto)}
                 maxLength={LARGO_BUSQUEDA} placeholder={BUSQUEDA_FUENTE[fuente]} /></div></div>
             {fuente === 'accesos' && (
               <div className="campo"><label htmlFor="a-res">Resultado</label>

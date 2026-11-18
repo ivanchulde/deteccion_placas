@@ -5,9 +5,10 @@ import {
   type Decision, decidirAcceso, type EstadoValidacion, MOTIVO_RESTRICCION, type PoliticaAutorizacion,
 } from '../dominio/decisionAcceso';
 import {
-  cabeceraCsvDetecciones, type DatosIngreso, ETIQUETA_ESTADO, type FilaExportacion, type FiltrosDetecciones, fechaHoraLocal, hayDatosIngreso,
+  cabeceraCsvDetecciones, type DatosIngreso, ETIQUETA_ESTADO, type FichaIngreso, type FilaExportacion, type FiltrosDetecciones, fechaHoraLocal, hayDatosIngreso,
   leerDatosIngreso, leerDatosValidacion, leerFiltros, leerLimite, leerPaginacion, leerPlacaConsulta, leerRegistroManual, lecturaUtilizable,
-  lineaCsvDeteccion, MAX_REGISTROS_PDF, normalizarFuente, REGLA_MOTIVO_ELIMINACION, REGLA_MOTIVO_ELIMINACION_MASIVA, serializarEvidencia, tieneFiltros,
+  lineaCsvDeteccion, MAX_REGISTROS_PDF, normalizarFuente, REGLA_MOTIVO_ELIMINACION, REGLA_MOTIVO_ELIMINACION_MASIVA, REGLA_PERSONA_INGRESO,
+  serializarEvidencia, tieneFiltros,
 } from '../dominio/detecciones';
 import { describirHorario, evaluarVigencia, validarHorario, type Vigencia } from '../dominio/horario';
 import { type Rol, tienePermiso } from '../dominio/permisos';
@@ -38,6 +39,17 @@ function describirDatosIngreso(x: DatosIngreso): string {
   return parte('ingresa', x.persona) + parte('cédula', x.cedula) + parte('motivo de ingreso', x.motivo)
     + parte('tipo de vehículo', x.tipo) + parte('marca', x.marca) + parte('modelo', x.modelo) + parte('color', x.color);
 }
+
+/** De dónde sale la persona de una cédula (GET /buscar-cedula y autollenado de la celda). */
+export type OrigenPersona = 'permiso' | 'ingreso' | 'solicitud' | 'permiso_anterior' | 'catastro_sri';
+/** «… desde …» de cada origen, para el mensaje y la auditoría. */
+const DESDE_ORIGEN: Record<OrigenPersona, string> = {
+  permiso: 'desde su permiso vigente', ingreso: 'desde un ingreso anterior', solicitud: 'desde su solicitud',
+  permiso_anterior: 'desde un permiso anterior', catastro_sri: 'desde el catastro público del RUC (SRI)',
+};
+
+/** 'AAAA-MM-DD' de una columna DATE leída como instante local (node-postgres la entrega a medianoche). */
+const diaCalendario = (v: Date) => `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
 
 /** Detección tal como la entrega la API y los eventos en tiempo real. */
 export type DeteccionDTO = Record<string, any> & { id: number; placa: string | null; estado_validacion: EstadoValidacion };
@@ -385,6 +397,31 @@ export function casosDetecciones(d: DependenciasDetecciones) {
     for (const f of filas) {
       if (f.fecha_hora_ingreso && new Date(f.fecha_hora_ingreso).getTime() >= desde) completarConSri(f);
     }
+  }
+
+  /**
+   * Cédula escrita en la fila (celda de la tabla): si el ingreso no tiene titular ni lo trae su
+   * permiso, se completa con lo que el sistema tiene de esa cédula o, si no, con el catastro del RUC
+   * importado; también institución, cargo y departamento que nunca se escribieron. Nunca reemplaza
+   * lo escrito. Agrega los datos a `x` y devuelve de dónde salieron (null = nada que completar).
+   */
+  async function titularPorCedula(actual: Fila, x: DatosIngreso): Promise<OrigenPersona | null> {
+    if (typeof x.cedula !== 'string' || x.persona !== undefined) return null;
+    if (datoRegistro(actual.persona_ingreso, actual.propietario)) return null;
+    const p = await d.repositorio.personaPorCedula(x.cedula).catch(() => null);
+    const nombre = validarTexto(p?.propietario, REGLA_PERSONA_INGRESO);
+    if (!p || !nombre.ok || !nombre.valor) return null;
+    x.persona = nombre.valor;
+    const ficha: Partial<FichaIngreso> = {};
+    const completar = (campo: 'institucion' | 'cargo' | 'departamento', delPaso: unknown, delPermiso: unknown, max: number) => {
+      const v = typeof p[campo] === 'string' ? p[campo].trim().slice(0, max).trim() : '';
+      if (v && x.ficha?.[campo] === undefined && delPaso == null && !datoRegistro(delPermiso)) ficha[campo] = v;
+    };
+    completar('institucion', actual.institucion_ingreso, actual.autorizado_institucion, 150);
+    completar('cargo', actual.cargo_ingreso, actual.autorizado_cargo, 150);
+    completar('departamento', actual.departamento_ingreso, actual.departamento, 100);
+    if (Object.keys(ficha).length) x.ficha = { ...x.ficha, ...ficha };
+    return p.origen as OrigenPersona;
   }
 
   /**
@@ -843,8 +880,8 @@ export function casosDetecciones(d: DependenciasDetecciones) {
     /**
      * Datos de una persona por su cédula, para autollenar los formularios: nombre, institución,
      * cargo y departamento de su permiso vigente, su último ingreso, su última solicitud o un
-     * permiso anterior, en ese orden. Solo datos del propio sistema: la cédula no sale a ningún
-     * servicio externo.
+     * permiso anterior, en ese orden; si el sistema no la tiene, solo el nombre del catastro del RUC
+     * importado de los datos abiertos del SRI. Todo es local: la cédula no sale a ningún servicio externo.
      */
     async buscarCedula(valor: unknown) {
       const cedula = typeof valor === 'string' ? valor.trim() : '';
@@ -855,8 +892,9 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       if (!f || !propietario) return { cedula, origen: null, fecha: null, persona: null };
       return {
         cedula,
-        origen: f.origen as 'permiso' | 'ingreso' | 'solicitud' | 'permiso_anterior',
-        fecha: f.fecha ? new Date(f.fecha).toISOString() : null,
+        origen: f.origen as OrigenPersona,
+        // El corte del catastro es un día (AAAA-MM-DD): como instante a medianoche se mostraba el día anterior
+        fecha: f.fecha ? (f.origen === 'catastro_sri' ? diaCalendario(new Date(f.fecha)) : new Date(f.fecha).toISOString()) : null,
         persona: { propietario, institucion: texto(f.institucion), cargo: texto(f.cargo), departamento: texto(f.departamento) },
       };
     },
@@ -1040,6 +1078,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       const actual = await d.repositorio.obtener(id);
       if (!actual) throw errorNoEncontrado('Detección no encontrada.');
       if (actual.tipo_movimiento === 'salida') throw errorValidacion('Los nombres y el motivo se registran en el ingreso, no en la salida.');
+      const autollenado = await titularPorCedula(actual, datos.valor);
       await d.repositorio.guardarDatosIngreso(id, datos.valor);
       const actualizado = await d.repositorio.obtener(id);
       const sinPlaca = actualizado
@@ -1054,8 +1093,13 @@ export function casosDetecciones(d: DependenciasDetecciones) {
         await d.repositorio.autorizarIngresoSinPlaca(id, actor.id);
       }
       await d.auditoria.operacion(actor, 'INGRESO_DATOS', 'deteccion', id,
-        `${actual.placa_validada || actual.placa_reconocida || 'sin placa'}${describirDatosIngreso(datos.valor)}`);
-      return { message: 'Datos del ingreso guardados.', deteccion: await difundir(id, 'deteccion:actualizada') };
+        `${actual.placa_validada || actual.placa_reconocida || 'sin placa'}${describirDatosIngreso(datos.valor)}`
+        + (autollenado ? ` · titular completado ${DESDE_ORIGEN[autollenado]} por la cédula` : ''));
+      return {
+        message: autollenado ? `Datos del ingreso guardados. Titular completado ${DESDE_ORIGEN[autollenado]}: confírmelo con su documento.` : 'Datos del ingreso guardados.',
+        titular_autollenado: autollenado,
+        deteccion: await difundir(id, 'deteccion:actualizada'),
+      };
     },
 
     /** Corrección administrativa del historial, distinta de autorizar un ingreso en la garita. */

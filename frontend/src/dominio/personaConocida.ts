@@ -5,11 +5,13 @@ import { fecha as formatoFecha, fechaHora } from './formato';
 /**
  * Datos de una persona que el sistema ya tiene registrados con su cédula
  * (GET /api/detecciones/buscar-cedula/:cedula): nombre, institución, cargo y departamento de su
- * permiso vigente, su último ingreso, su última solicitud o un permiso anterior. Todo es local:
- * la cédula no sale a ningún servicio externo. Aquí se convierten en los campos del formulario.
+ * permiso vigente, su último ingreso, su última solicitud o un permiso anterior; si no, solo el
+ * nombre del catastro del RUC importado (datos abiertos del SRI). Todo es local: la cédula no sale
+ * a ningún servicio externo. Aquí se convierten en los campos del formulario.
  */
 
-export type OrigenPersona = 'permiso' | 'ingreso' | 'solicitud' | 'permiso_anterior';
+/** catastro_sri = solo el nombre, del catastro del RUC importado de los datos abiertos del SRI */
+export type OrigenPersona = 'permiso' | 'ingreso' | 'solicitud' | 'permiso_anterior' | 'catastro_sri';
 
 export interface PersonaConocida {
   cedula: string;
@@ -47,6 +49,7 @@ export function textoOrigenPersona(r: Pick<PersonaConocida, 'origen' | 'fecha'>)
     case 'ingreso': return `su ingreso del ${fechaHora(r.fecha)}`;
     case 'solicitud': return `su solicitud del ${formatoFecha(r.fecha)}`;
     case 'permiso_anterior': return 'un permiso anterior que ya no está vigente';
+    case 'catastro_sri': return `el catastro público del RUC del SRI${r.fecha ? ` (corte ${formatoFecha(r.fecha)})` : ''}`;
     default: return 'los registros del sistema';
   }
 }
