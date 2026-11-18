@@ -8,14 +8,15 @@ import {
 import api, { mensajeError } from '../../infraestructura/api';
 import { useAuth } from '../../aplicacion/AuthContext';
 import { useEvento, useReconexion } from '../../aplicacion/tiempoReal';
-import { useConsulta, useDiferido, usePaginaVisible } from '../../aplicacion/hooks';
-import type { Deteccion, EstadoAnpr, ResumenPanel } from '../../dominio/tipos';
+import { useConsulta, useDiferido, useFechaLocal, usePaginaVisible } from '../../aplicacion/hooks';
+import type { Deteccion, ResumenPanel } from '../../dominio/tipos';
 import { diaCorto, fecha, hora, numero, relativo, SERIES_ESTADO } from '../../dominio/formato';
 import { formatearPlaca, validarPlaca } from '../../dominio/validacion';
 import { ESTADOS_ACCESO, estadoAcceso } from '../../dominio/estadoAcceso';
 import { Cargando, FilasEsqueleto, InsigniaEstado, Kpi, Tarjeta, Vacio } from '../componentes/ui';
 import { BarrasApiladas, Dona } from '../componentes/Graficos';
 import { PlacaFoto } from '../componentes/deteccion';
+import { CampoPlaca } from '../componentes/campos';
 import { CeldaIngreso, actualizarCampoIngreso, type CampoIngreso } from '../componentes/CeldaIngreso';
 import { ConfianzaRegistro } from '../componentes/ConfianzaRegistro';
 import { VisorZoom } from '../componentes/ZoomDual';
@@ -30,7 +31,8 @@ function saludo(): string {
 
 /** Recarga el resumen cuando llegan eventos (agrupados cada 5 s) y al volver a la pestaña. */
 function useResumen() {
-  const consulta = useConsulta<ResumenPanel>(() => api.get('/panel/resumen').then(r => r.data), []);
+  const dia = useFechaLocal();
+  const consulta = useConsulta<ResumenPanel>(() => api.get('/panel/resumen').then(r => r.data), [dia]);
   const visible = usePaginaVisible();
   const [pendiente, setPendiente] = useState(false);
   const recargar = useDiferido(() => {
@@ -131,12 +133,10 @@ const PanelOperador: React.FC = () => {
   const notificar = useNotificar();
   const resumen = useResumen();
   const { datos: r, cargando, error } = resumen;
-  const [identificador, setIdentificador] = useState('');
+  const [placa, setPlaca] = useState('');
   const [registrando, setRegistrando] = useState(false);
   const [confirmacion, setConfirmacion] = useState<{ titulo: string; texto: string; tipo: 'exito' | 'aviso' } | null>(null);
-  const estadoSalida = useConsulta<EstadoAnpr>(() => api.get('/monitoreo/estado').then(x => x.data), []);
-  const salidaManual = estadoSalida.datos?.salida_manual !== false;
-  const identificadorValido = /^\d{10}$/.test(identificador) || validarPlaca(identificador).ok;
+  const placaValida = validarPlaca(placa).ok;
 
   useEffect(() => {
     if (!confirmacion) return;
@@ -151,16 +151,16 @@ const PanelOperador: React.FC = () => {
   }, [confirmacion]);
 
   const registrarMovimientoInteligente = async () => {
-    if (!identificadorValido || registrando) return;
+    if (!placaValida || registrando) return;
     setRegistrando(true);
     try {
       const { data } = await api.post<{
         movimiento: 'entrada' | 'salida'; deteccion: Deteccion;
-        /** «desde …» cuando el sistema completó datos de la placa o la cédula */
+        /** Origen de los datos conocidos de la placa. */
         autollenado?: string | null;
         /** Cámara de la que salieron las fotos automáticas y la placa que leyó */
         foto?: { camara_id: number; placa_leida: string | null; leyo_la_placa: boolean } | null;
-      }>('/detecciones/movimiento-placa', { identificador });
+      }>('/detecciones/movimiento-placa', { placa });
       const d = data.deteccion;
       const persona = d.persona_ingreso?.trim() || d.autorizado?.propietario || d.datos_permiso?.propietario;
       if (data.movimiento === 'salida') {
@@ -174,8 +174,6 @@ const PanelOperador: React.FC = () => {
         const detalles = [
           data.autollenado ? `Datos completados ${data.autollenado}: confírmelos con el documento.` : '',
           data.foto ? `Foto tomada de la cámara ${d.camara?.nombre ?? data.foto.camara_id}.` : 'Sin foto: ninguna cámara de ingreso entregó imagen.',
-          !d.placa && data.foto?.placa_leida ? `La cámara leyó ${formatearPlaca(data.foto.placa_leida)}: si es su vehículo, corrija la placa en Registro de Ingresos.` : '',
-          !d.placa && !data.foto?.placa_leida ? 'Ingreso sin placa: complétela en Registro de Ingresos.' : '',
         ].filter(Boolean).join(' ');
         setConfirmacion({
           tipo: 'exito',
@@ -183,7 +181,7 @@ const PanelOperador: React.FC = () => {
           texto: `Su registro de ingreso vehicular ha sido registrado con éxito. ${detalles}`.trim(),
         });
       }
-      setIdentificador('');
+      setPlaca('');
       await resumen.recargar(true);
     } catch (e) {
       notificar('error', 'No se pudo registrar el movimiento', mensajeError(e));
@@ -209,23 +207,13 @@ const PanelOperador: React.FC = () => {
         <section className="guardia-celda guardia-control" aria-label="Registro de entrada o salida">
           <RelojGuardia />
           <div className="guardia-acciones">
-            <div className="guardia-identificador">
-              <label htmlFor="guardia-identificador">Placa o cédula</label>
-              <input id="guardia-identificador" className="input" type="text" inputMode="text" autoComplete="off"
-                maxLength={10} value={identificador} disabled={registrando}
-                placeholder="ABC1234 o 0123456789"
-                onChange={e => setIdentificador(e.target.value.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase().slice(0, 10))}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void registrarMovimientoInteligente(); } }} />
-              <small><kbd>Enter</kbd> registra entrada o salida y completa los datos que el sistema conoce, con la foto de la cámara. Si una cédula tiene varias placas o vehículos dentro, use la placa para elegir.</small>
-            </div>
+            <CampoPlaca id="guardia-placa" className="guardia-identificador" etiqueta="Placa del vehículo" ayuda={null}
+              valor={placa} onCambiar={setPlaca} deshabilitado={registrando} onEnter={registrarMovimientoInteligente} />
             <button className="btn guardia-movimiento" onClick={() => void registrarMovimientoInteligente()}
-              disabled={!identificadorValido || registrando}>
+              disabled={!placaValida || registrando}>
               {registrando ? 'Registrando…' : 'Registrar movimiento'}
             </button>
           </div>
-          <p className="guardia-indicacion">{salidaManual
-            ? 'El sistema identifica si corresponde una entrada o una salida, ya sea por placa o por cédula.'
-            : 'La salida manual está desactivada; la cámara registra la salida por placa.'}</p>
         </section>
         <BalanceGuardia entradas={r?.movimientos?.entradas ?? 0} salidas={r?.movimientos?.salidas ?? 0} cargando={cargando && !r} />
       </div>

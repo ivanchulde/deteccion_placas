@@ -536,7 +536,8 @@ export const RUTAS: RutaDoc[] = [
   {
     metodo: 'get', ruta: '/api/detecciones/', etiqueta: 'Detecciones', acceso: 'operacion:monitorear',
     resumen: 'Historial de ingresos paginado y con filtros',
-    consulta: { ...FILTROS_DETECCIONES, ...PAGINACION },
+    consulta: { ...FILTROS_DETECCIONES, ...PAGINACION,
+      entradas_hoy: { tipo: 'string', valores: ['si'], descripcion: 'Selecciona los ingresos desde la medianoche institucional hasta ahora, incluidos los que ya tienen salida.' } },
   },
   {
     metodo: 'get', ruta: '/api/detecciones/historial/resumen', etiqueta: 'Detecciones', acceso: 'operacion:monitorear',
@@ -633,17 +634,17 @@ export const RUTAS: RutaDoc[] = [
   },
   {
     metodo: 'post', ruta: '/api/detecciones/movimiento-placa', etiqueta: 'Detecciones', acceso: 'detecciones:validar',
-    resumen: 'Registra entrada o salida usando una placa o cédula',
-    descripcion: 'Operación rápida para la garita. Cierra el ingreso abierto más reciente por placa o cédula (manual o ANPR); si una cédula tiene varios vehículos dentro, exige la placa. Sin ingreso abierto, la placa se evalúa contra las listas y la cédula debe corresponder a un solo permiso activo asociado a una placa válida; si tiene varios, exige la placa.',
-    cuerpo: { identificador: { tipo: 'string', descripcion: 'Placa ANT o cédula de exactamente 10 dígitos; conserva los ceros iniciales', requerido: true, ejemplo: '0123456789' } },
-    respuestas: { 201: 'Entrada manual registrada', 200: 'Salida registrada', 400: 'Identificador inválido, permiso sin placa o salida manual desactivada', 404: 'No existe un permiso activo o el ingreso asociado ya no está disponible', 409: 'Permiso ambiguo o no asociado inequívocamente a la placa' },
+    resumen: 'Registra la entrada o salida de una placa',
+    descripcion: 'Cierra el ingreso abierto de la placa si la salida manual está habilitada. Si el vehículo no tiene un ingreso abierto, registra su entrada y consulta las listas de acceso.',
+    cuerpo: { placa: { tipo: 'string', requerido: true, descripcion: 'Matrícula del vehículo en formato ANT', ejemplo: 'PBA1234' } },
+    respuestas: { 201: 'Entrada manual registrada', 200: 'Salida registrada', 400: 'Placa inválida o ausente', 403: 'Salida manual desactivada', 404: 'Ingreso abierto no disponible' },
   },
   {
     metodo: 'post', ruta: '/api/detecciones/registro-manual', etiqueta: 'Detecciones', acceso: 'detecciones:validar',
     resumen: 'Registra a mano un paso vehicular',
     descripcion: 'Se cruza con las listas como una lectura automática; no modifica el padrón de autorizados.',
     cuerpo: {
-      placa: { tipo: 'string', nullable: true, descripcion: 'Formato ANT: ABC-1234 o AB-123C; null o vacío para vehículo sin matrícula legible o con rótulo de concesionaria.', ejemplo: 'PBA1234' },
+      placa: { tipo: 'string', nullable: true, descripcion: 'Matrícula ANT del vehículo. Obligatoria para los ingresos manuales del guardia.', ejemplo: 'PBA1234' },
       motivo: { tipo: 'string', requerido: true, descripcion: 'Texto libre sin < >, 5 a 300 caracteres', ejemplo: 'Cámara fuera de servicio' },
       camara_id: { tipo: 'integer', ejemplo: 1 },
       tipo_vehiculo: { tipo: 'string', ejemplo: 'Camioneta' },

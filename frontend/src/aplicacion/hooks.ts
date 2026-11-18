@@ -1,6 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mensajeError } from '../infraestructura/api';
 import { versionCargada, versionPublicada } from '../infraestructura/version';
+import { fechaIsoLocal, limiteDia } from '../dominio/formato';
+
+/** Cambia al iniciar el siguiente día en Ecuador, incluso si la pestaña estuvo suspendida. */
+export function useFechaLocal() {
+  const [dia, setDia] = useState(() => fechaIsoLocal());
+  useEffect(() => {
+    const actualizar = () => setDia(fechaIsoLocal());
+    const demora = Date.parse(limiteDia(dia, true)) + 1 - Date.now();
+    const temporizador = window.setTimeout(actualizar, Math.max(0, demora));
+    document.addEventListener('visibilitychange', actualizar);
+    return () => {
+      window.clearTimeout(temporizador);
+      document.removeEventListener('visibilitychange', actualizar);
+    };
+  }, [dia]);
+  return dia;
+}
 
 /** true mientras la pestaña está visible (Page Visibility API). */
 export function usePaginaVisible(): boolean {

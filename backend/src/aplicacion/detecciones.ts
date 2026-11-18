@@ -182,8 +182,6 @@ export interface RepositorioDetecciones {
   analisisHistorial(f: FiltrosDetecciones): Promise<AnalisisHistorial>;
   recientes(limite: number, buscar?: string | null): Promise<Fila[]>;
   ingresoAbiertoPorPlaca(placa: string): Promise<number | null>;
-  ingresosAbiertosPorCedula(cedula: string): Promise<number[]>;
-  permisosActivosPorCedula(cedula: string): Promise<Fila[]>;
   /**
    * Datos de la persona registrados con esa cédula (origen, fecha, propietario, institución, cargo y
    * departamento): su permiso vigente, su último ingreso, su última solicitud o un permiso anterior.
@@ -259,16 +257,10 @@ export interface EvidenciaAutomatica {
   anchoPlacaPx?: number | null;
 }
 
-/**
- * Datos que el sistema completa solo en un registro manual (dashboard del guardia): lo que ya
- * conoce de la placa o de la cédula. `desde` es el texto para la auditoría y el aviso
- * («desde un ingreso anterior de la placa»); con `soloSinPermiso` no se usa si la placa tiene
- * permiso vigente (el permiso ya trae sus datos).
- */
-export interface AutollenadoManual {
+/** Datos de la última visita de la placa y su procedencia para la auditoría. */
+interface AutollenadoManual {
   datos: DatosIngreso;
   desde: string;
-  soloSinPermiso?: boolean;
 }
 
 /** Encabezado del reporte PDF de Registro de Salidas. */
@@ -324,7 +316,7 @@ export interface DependenciasDetecciones {
   vehiculoSri?: { consultar(placa: string): Promise<DatosVehiculoPublico | null> };
   eventos: PuertoEventos;
   auditoria: PuertoAuditoria;
-  tiempo: { ahora(): Date; zona: string };
+  tiempo: { ahora(): Date; inicioDiaLocal(fecha: Date): Date; zona: string };
 }
 
 type Entrada = Record<string, any>;
@@ -490,15 +482,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       cargo: datoRegistro(previo.cargo_ingreso, previo.autorizado_cargo),
       departamento: datoRegistro(previo.departamento_ingreso, previo.departamento),
     });
-    return datos.persona ? { datos, desde: `desde el ingreso anterior de la placa (${fechaHoraLocal(previo.fecha_hora_ingreso)})`, soloSinPermiso: true } : null;
-  }
-
-  /** Lo que el sistema sabe de una cédula sin permiso vigente (registros propios o catastro del RUC). */
-  async function autollenadoPorCedula(cedula: string): Promise<AutollenadoManual> {
-    const p = await d.repositorio.personaPorCedula(cedula).catch(() => null);
-    const datos = datosValidos({ cedula, persona_ingreso: p?.propietario },
-      p ? { institucion: p.institucion, cargo: p.cargo, departamento: p.departamento } : null);
-    return { datos, desde: datos.persona && p ? DESDE_ORIGEN[p.origen as OrigenPersona] ?? 'desde los registros de la cédula' : 'con la cédula' };
+    return datos.persona ? { datos, desde: `desde el ingreso anterior de la placa (${fechaHoraLocal(previo.fecha_hora_ingreso)})` } : null;
   }
 
   /**
@@ -865,6 +849,12 @@ export function casosDetecciones(d: DependenciasDetecciones) {
 
     async listar(consulta: Entrada) {
       const f = filtros(consulta);
+      if (consulta.entradas_hoy === 'si') {
+        const ahora = d.tiempo.ahora();
+        f.desde = d.tiempo.inicioDiaLocal(ahora);
+        f.hasta = ahora;
+        f.movimiento = 'ingreso';
+      }
       const p = leerPaginacion(consulta);
       if (!p.ok) throw errorValidacion(p.error);
       const { pagina, tamano } = p.valor;
@@ -1104,7 +1094,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       return d.evidenciaManual.cuadros(id.valor);
     },
 
-    async registroManual(entrada: unknown, actor: Actor, permisoEsperadoId?: number, autollenado?: AutollenadoManual | null) {
+    async registroManual(entrada: unknown, actor: Actor) {
       const r = leerRegistroManual(cuerpo(entrada));
       if (!r.ok) throw errorValidacion(r.error);
       const { placa, motivo, camaraId, tipoVehiculo, marca, cuadroT, ficha } = r.valor;
@@ -1113,6 +1103,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       if (ficha) ingreso.valor.ficha = { ...ingreso.valor.ficha, ...ficha };
       const direccion = camaraId === null ? 'ingreso' : await d.repositorio.direccionCamara(camaraId);
       if (direccion === null) throw errorValidacion('La cámara seleccionada no existe o no tiene una dirección válida.');
+      if (actor.rol === 'Guardia' && direccion === 'ingreso' && !placa) throw errorValidacion('La placa es obligatoria para registrar el ingreso.');
       if (direccion === 'salida' && !d.salidaManual()) throw errorProhibido('El registro manual de salidas está desactivado en Configuración: lo hace la cámara de salida.');
       // Foto elegida de los últimos 30 s de la cámara: se guarda antes de crear el registro
       let rutaImagen: string | null = null;
@@ -1155,13 +1146,10 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       const cruce: Cruce = placa
         ? await cruzarListas(placa, d.tiempo.ahora())
         : { alerta: null, permiso: null, vigencia: null };
-      if (permisoEsperadoId !== undefined && !cruce.alerta && cruce.permiso?.id !== permisoEsperadoId) {
-        throw errorConflicto('El permiso asociado a la cédula no coincide de forma única con la placa. Verifique la lista blanca antes de registrar el ingreso.');
-      }
       const decision = decidirAcceso({ origen: 'manual', ...entradaListas(cruce), politica: d.politica() });
-      // Datos conocidos de la placa o la cédula: solo completan lo que el registro no trae
-      const completado = autollenado && !(autollenado.soloSinPermiso && cruce.permiso)
-        ? completarDatosIngreso(ingreso.valor, autollenado.datos) : false;
+      const autollenado = actor.rol === 'Guardia' && placa && !cruce.permiso
+        ? await autollenadoPorPlaca(placa).catch(() => null) : null;
+      const desde = autollenado && completarDatosIngreso(ingreso.valor, autollenado.datos) ? autollenado.desde : null;
       const id = await d.repositorio.crearManual({
         placa, camaraId: camaraRegistro, tipo: ingreso.valor.tipo || tipoVehiculo || cruce.permiso?.tipo_vehiculo || null,
         marca: ingreso.valor.marca ?? marca, usuarioId: actor.id, ...conFoto,
@@ -1169,10 +1157,10 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       if (hayDatosIngreso(ingreso.valor)) await d.repositorio.guardarDatosIngreso(id, ingreso.valor);
       await d.auditoria.operacion(actor, 'REGISTRO_MANUAL', 'deteccion', id,
         `${placa ?? 'sin placa'} (${ETIQUETA_ESTADO[decision.estado]}) · ${motivo}${describirDatosIngreso(ingreso.valor)}`
-        + `${completado ? ` · datos completados ${autollenado!.desde}` : ''}${notaFoto}`);
+        + `${desde ? ` · datos completados ${desde}` : ''}${notaFoto}`);
       const dto = await difundir(id, 'deteccion:nueva');
       await avisarSiCorresponde(dto, decision, cruce.permiso);
-      return { message: 'Ingreso registrado manualmente.', deteccion: dto, autollenado: completado ? autollenado!.desde : null, foto };
+      return { message: 'Ingreso registrado manualmente.', deteccion: dto, autollenado: desde, foto };
     },
 
     /**
@@ -1335,68 +1323,10 @@ export function casosDetecciones(d: DependenciasDetecciones) {
       };
     },
 
-    /** Enter de garita: acepta una placa o cédula y cierra un ingreso abierto o registra uno nuevo. */
+    /** Registra el movimiento de la placa según tenga o no un ingreso abierto. */
     async registrarMovimientoPorPlaca(entrada: unknown, actor: Actor) {
       const b = cuerpo(entrada);
-      const identificador = typeof b.identificador === 'string' ? b.identificador : b.placa;
-      if (typeof identificador !== 'string') throw errorValidacion('Ingrese una placa o una cédula de 10 dígitos.');
-      const valor = identificador.trim();
-      const esCedula = /^\d{10}$/.test(valor);
-      if (!esCedula && /^\d+$/.test(valor)) throw errorValidacion('La cédula debe tener exactamente 10 dígitos.');
-
-      if (esCedula) {
-        const abiertos = await d.repositorio.ingresosAbiertosPorCedula(valor);
-        if (abiertos.length > 1) {
-          throw errorConflicto('La cédula tiene más de un vehículo dentro. Use la placa para registrar la salida.');
-        }
-        if (abiertos.length === 1) {
-          const abierto = abiertos[0];
-          if (!d.salidaManual()) throw errorProhibido('La salida manual está desactivada en Configuración.');
-          const actual = await d.repositorio.obtener(abierto);
-          if (!actual) throw errorNoEncontrado('El ingreso asociado a esa cédula ya no está disponible. Actualice e intente de nuevo.');
-          const respuesta = await this.registrarSalida(abierto, actor, true);
-          const persona = String(actual.persona_ingreso || actual.propietario || '').trim();
-          const placaActual = normalizarPlaca(actual.placa_validada || actual.placa_reconocida || actual.placa);
-          return {
-            ...respuesta,
-            message: persona
-              ? `La salida de ${persona} se registró con éxito.`
-              : `La salida${placaActual ? ` de la placa ${placaActual}` : ''} se registró con éxito.`,
-            movimiento: 'salida' as const,
-          };
-        }
-
-        const permisos = await d.repositorio.permisosActivosPorCedula(valor);
-        if (permisos.length === 0) {
-          // Sin permiso vigente: ingreso por revisar con la persona que el sistema conoce (registros
-          // propios o catastro del RUC) y las fotos de la cámara. La placa la confirma el guardia en la
-          // tabla: la que lea la cámara no se asigna sola porque decidiría el acceso de otro vehículo.
-          return {
-            ...(await this.registroManual({ motivo: 'Ingreso manual por cédula desde el dashboard del guardia' },
-              actor, undefined, await autollenadoPorCedula(valor))),
-            movimiento: 'entrada' as const,
-          };
-        }
-        if (permisos.length > 1) throw errorConflicto('La cédula está asociada a varias placas. Ingrese la placa específica para registrar el ingreso.');
-        const permiso = permisos[0];
-        const placaPermiso = validarPlaca(permiso.placa);
-        if (!placaPermiso.ok) throw errorValidacion('El permiso asociado a la cédula no tiene una placa válida.');
-
-        return {
-          ...(await this.registroManual({
-            placa: placaPermiso.valor.placa,
-            cedula: valor,
-            persona_ingreso: permiso.propietario,
-            tipo_vehiculo: permiso.tipo_vehiculo,
-            marca: permiso.marca,
-            motivo_ingreso: permiso.motivo_ingreso,
-            motivo: 'Ingreso manual desde el dashboard del guardia',
-          }, actor, Number(permiso.id))),
-          movimiento: 'entrada' as const,
-        };
-      }
-
-      const placa = validarPlaca(valor);
+      const placa = validarPlaca(b.placa ?? b.identificador);
       if (!placa.ok) throw errorValidacion(placa.error);
 
       const ingresoAbierto = await d.repositorio.ingresoAbiertoPorPlaca(placa.valor.placa);
@@ -1413,7 +1343,7 @@ export function casosDetecciones(d: DependenciasDetecciones) {
         ...(await this.registroManual({
           placa: placa.valor.placa,
           motivo: 'Ingreso manual desde el dashboard del guardia',
-        }, actor, undefined, await autollenadoPorPlaca(placa.valor.placa).catch(() => null))),
+        }, actor)),
         movimiento: 'entrada' as const,
       };
     },

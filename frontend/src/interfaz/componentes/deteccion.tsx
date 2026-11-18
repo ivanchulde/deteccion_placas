@@ -479,6 +479,7 @@ export const FotosRecientes: React.FC<{ camaraId: number; elegida: number | null
 /** Registro manual de un paso (cámara sin lectura, visita, etc.). */
 export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?: string; onRegistrada?: (d: Deteccion) => void }> = ({ onCerrar, placaInicial = '', onRegistrada }) => {
   const notificar = useNotificar();
+  const esGuardia = useAuth().user?.rol === 'Guardia';
   const [formulario, setFormulario] = useState<FormularioPermiso>(() => ({
     placa: placaPropuesta(placaInicial), propietario: '', cedula: '', institucion: '', cargo: '', departamento: '',
     tipo_vehiculo: '', marca: '', modelo: '', color: '', motivo_ingreso: '', fecha_inicio: '', fecha_fin: '', observaciones: '',
@@ -493,6 +494,8 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
   const navigate = useNavigate();
   const camaraSeleccionada = camaras.find(c => c.id === Number(camara));
   const esIngreso = camaraSeleccionada?.direccion !== 'salida';
+  const ingresoPorPlaca = esIngreso && esGuardia;
+  const mostrarFicha = esIngreso && !esGuardia;
   const [foto, setFoto] = useState<number | null>(null);
   useEffect(() => {
     Promise.all([api.get<Camara[]>('/camaras'), api.get<{ salida_manual?: boolean }>('/monitoreo/estado').catch(() => null)]).then(([r, estado]) => {
@@ -513,9 +516,9 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
     && fechasOk && !errorHorario && horarioValido(horario);
   const placa = formulario.placa;
 
-  // Dueño y vehículo que el sistema ya conoce de la placa (lista blanca o su último ingreso): se cargan
-  // solos al escribirla. Con otra placa, lo cargado se reemplaza; lo que escribió el guardia no se toca.
-  const [conocida, setConocida] = useState<{ origen: OrigenDatos; alerta: boolean } | null>(null);
+  // La consulta muestra la situación de la placa. En la ficha completa también rellena los datos
+  // conocidos sin reemplazar los escritos a mano.
+  const [conocida, setConocida] = useState<{ placa: string; origen: OrigenDatos; alerta: boolean } | null>(null);
   const autollenado = useRef<Partial<Record<CampoAutollenado, string>>>({});
   const ultimoFormulario = useRef(formulario);
   ultimoFormulario.current = formulario;
@@ -529,29 +532,32 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
         const r = await api.get<BusquedaPlaca>(`/detecciones/buscar-placa/${encodeURIComponent(clavePlaca)}`);
         if (cancelado) return;
         const { origen, datos, alerta } = datosConocidos(r.data);
+        setConocida({ placa: clavePlaca, origen, alerta });
+        if (!mostrarFicha) return;
         const actual = ultimoFormulario.current;
         const { formulario: nuevo, aplicados } = aplicarDatosConocidos(actual, datos, autollenado.current);
         autollenado.current = aplicados;
         const cambios = Object.fromEntries(Object.entries(nuevo).filter(([k, v]) => actual[k as keyof FormularioPermiso] !== v));
         if (Object.keys(cambios).length) setFormulario(x => ({ ...x, ...cambios }));
-        setConocida({ origen, alerta });
       } catch {
         if (!cancelado) setConocida(null);
       }
     }, 350);
     return () => { cancelado = true; window.clearTimeout(t); };
-  }, [clavePlaca]);
+  }, [clavePlaca, mostrarFicha]);
 
-  const valido = (!placa.trim() || validarPlaca(placa).ok) && validarTexto(motivo, REGLA_MOTIVO_MANUAL).ok
-    && (!esIngreso || datosPermisoValidos);
+  const reglaMotivo = ingresoPorPlaca ? { ...REGLA_MOTIVO_MANUAL, requerido: false } : REGLA_MOTIVO_MANUAL;
+  const valido = (placaLeida.ok || (!ingresoPorPlaca && !placa.trim())) && validarTexto(motivo, reglaMotivo).ok
+    && (!mostrarFicha || datosPermisoValidos);
 
   const guardar = async () => {
+    if (!valido || enviando) return;
     setEnviando(true);
     setError(null);
     try {
       const r = await api.post('/detecciones/registro-manual', {
-        placa: placa.trim() || null, motivo: motivo.trim(), camara_id: camara ? Number(camara) : undefined,
-        ...(esIngreso ? { datos_permiso: {
+        placa: placa.trim() || null, motivo: motivo.trim() || 'Ingreso manual por placa', camara_id: camara ? Number(camara) : undefined,
+        ...(mostrarFicha ? { datos_permiso: {
           placa: placa.trim() || null, propietario: formulario.propietario.trim(), cedula: formulario.cedula.trim(),
           institucion: formulario.institucion, cargo: formulario.cargo, departamento: formulario.departamento,
           tipo_vehiculo: formulario.tipo_vehiculo, marca: formulario.marca, modelo: formulario.modelo, color: formulario.color,
@@ -561,7 +567,7 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
         ...(camara && foto !== null ? { cuadro_t: foto } : {}),
       });
       const d: Deteccion = r.data.deteccion;
-      const persona = d.persona_ingreso?.trim() || formulario.propietario.trim();
+      const persona = d.persona_ingreso?.trim() || d.autorizado?.propietario || (mostrarFicha && formulario.propietario.trim());
       if (d.tipo_movimiento !== 'salida' && d.estado_validacion === 'autorizado') {
         notificar('exito', `¡Bienvenido${persona ? `, ${persona}` : ''}!`, 'Su ingreso vehicular está autorizado.');
       } else {
@@ -578,34 +584,34 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
   };
 
   return (
-    <Modal titulo={`Registrar ${camaraSeleccionada?.direccion === 'salida' ? 'salida' : 'ingreso'} manual`} subtitulo="Para movimientos que la cámara no registró o no pudo leer" onCerrar={onCerrar} bloquear={enviando} tamano="panoramico"
+    <Modal titulo={`Registrar ${camaraSeleccionada?.direccion === 'salida' ? 'salida' : 'ingreso'} manual`} subtitulo="Para movimientos que la cámara no registró o no pudo leer" onCerrar={onCerrar} bloquear={enviando} tamano={ingresoPorPlaca ? 'normal' : 'panoramico'}
       pie={<>
         <button className="btn btn-secondary" onClick={onCerrar} disabled={enviando}>Cancelar</button>
         <button className="btn btn-navy" onClick={guardar} disabled={!valido || enviando}>{enviando && <Loader2 size={14} className="girar" />} Registrar {camaraSeleccionada?.direccion === 'salida' ? 'salida' : 'ingreso'}</button>
       </>}>
       <div className="formulario-manual">
-        {esIngreso
+        {mostrarFicha
           ? <CamposFormularioPermiso prefijo="man" valor={formulario} onCambiar={c => setFormulario(actual => ({ ...actual, ...c }))}
             horario={horario} onHorario={h => { setHorario(h); setErrorHorario(null); }} errorHorario={errorHorario}
             placaOpcional enfocarPlaca distribucion="panoramica" />
           : <section className="completo formulario-seccion">
             <h4 className="permiso-seccion-titulo">Datos del vehículo</h4>
             <div className="form-grid">
-              <CampoPlaca id="man-placa-salida" etiqueta="Placa (opcional)" requerido={false} valor={placa}
+              <CampoPlaca id="man-placa" etiqueta={ingresoPorPlaca ? 'Placa del vehículo' : 'Placa (opcional)'} requerido={ingresoPorPlaca} valor={placa}
                 onCambiar={v => setFormulario(actual => ({ ...actual, placa: v }))} autoFocus
-                ayuda="Déjela vacía cuando no haya una matrícula legible." />
+                onEnter={ingresoPorPlaca ? guardar : undefined} ayuda={ingresoPorPlaca ? undefined : 'Déjela vacía cuando no haya una matrícula legible.'} />
             </div>
           </section>}
-        {esIngreso && conocida && (conocida.alerta
-          ? <div className="completo"><Aviso tipo="error">La placa está en la <b>lista negra</b>. Se cargaron los datos que el sistema tiene de ella: siga el protocolo antes de permitir el ingreso.</Aviso></div>
+        {conocida && conocida.placa === clavePlaca && (conocida.alerta
+          ? <div className="completo"><Aviso tipo="error">La placa está en la <b>lista negra</b>. Siga el protocolo antes de permitir el ingreso.</Aviso></div>
           : conocida.origen.tipo === 'permiso'
-            ? <AvisoFlotante tipo="info">Placa con permiso en la lista blanca: se cargaron los datos del titular y del vehículo.</AvisoFlotante>
+            ? <AvisoFlotante tipo="info">{ingresoPorPlaca ? 'Placa con permiso en la lista blanca.' : 'Placa con permiso en la lista blanca: se cargaron los datos del titular y del vehículo.'}</AvisoFlotante>
             : conocida.origen.tipo === 'historial'
-              ? <AvisoFlotante tipo="info">Esta placa ya ingresó el {fechaHora(conocida.origen.fecha)}: se cargaron los datos de la persona y del vehículo de ese ingreso. Confírmelos con el conductor.</AvisoFlotante>
-              : <small className="completo texto-secundario" role="status">Placa sin registros en el sistema: escriba los datos de la persona. Los del vehículo se completan con el SRI cuando los tiene.</small>)}
+              ? <AvisoFlotante tipo="info">Esta placa ya ingresó el {fechaHora(conocida.origen.fecha)}.{mostrarFicha && ' Se cargaron los datos de la persona y del vehículo de ese ingreso. Confírmelos con el conductor.'}</AvisoFlotante>
+              : <small className="completo texto-secundario" role="status">{ingresoPorPlaca ? 'Placa sin ingresos anteriores.' : 'Placa sin registros en el sistema: escriba los datos de la persona. Los del vehículo se completan con el SRI cuando los tiene.'}</small>)}
         <section className="completo formulario-seccion">
           <h4 className="permiso-seccion-titulo">Datos del registro manual</h4>
-          {esIngreso && <AvisoFlotante tipo="info">
+          {mostrarFicha && <AvisoFlotante tipo="info">
             Vigencia, horario y observaciones se guardan en la ficha de este ingreso; no crean ni modifican permisos ni cambian la decisión de acceso.
           </AvisoFlotante>}
           <div className="form-grid">
@@ -619,8 +625,8 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
             </div>
             {camara && <FotosRecientes camaraId={Number(camara)} elegida={foto} onElegir={setFoto} />}
             <div className="completo pila" style={{ gap: 6 }}>
-              <CampoTexto id="man-motivo-registro" etiqueta="Motivo del registro manual*" valor={motivo} onCambiar={setMotivo}
-                regla={REGLA_MOTIVO_MANUAL} multilinea ayuda="Entre 5 y 300 caracteres."
+              <CampoTexto id="man-motivo-registro" etiqueta={ingresoPorPlaca ? 'Motivo del registro (opcional)' : 'Motivo del registro manual*'} valor={motivo} onCambiar={setMotivo}
+                regla={reglaMotivo} multilinea ayuda="Entre 5 y 300 caracteres."
                 placeholder="Ej.: cámara fuera de servicio, placa ilegible por suciedad, ingreso de visita" />
               <div className="fila" style={{ gap: 6 }} role="group" aria-label="Motivos frecuentes del registro manual">
                 {MOTIVOS_MANUAL_FRECUENTES.map(m => (
@@ -634,7 +640,7 @@ export const RegistroManualModal: React.FC<{ onCerrar: () => void; placaInicial?
         </section>
         <div className="completo"><AvisoFlotante tipo="info">{camaraSeleccionada?.direccion === 'salida'
           ? 'La salida se registra como movimiento independiente y no modifica permisos ni decisiones de ingreso.'
-          : !placa.trim() ? 'El ingreso se guarda sin placa legible. Complete los datos de la persona, el vehículo y el motivo para poder registrar su salida.'
+          : mostrarFicha && !placa.trim() ? 'El ingreso se guarda sin placa legible. Complete los datos de la persona, el vehículo y el motivo para poder registrar su salida.'
             : 'El ingreso se cruza con las listas como cualquier lectura. No modifica el padrón de autorizados: para autorizar un vehículo use la pantalla de listas.'}</AvisoFlotante></div>
         {error && <div className="completo"><Aviso tipo="error">{error}</Aviso></div>}
       </div>

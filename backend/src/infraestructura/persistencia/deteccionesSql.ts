@@ -621,19 +621,6 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
     return r.recordset[0]?.id ?? null;
   },
 
-  async ingresosAbiertosPorCedula(cedula) {
-    const r = await db().request().input('cedula', sql.VarChar(10), cedula).query(`
-      SELECT d.id
-      FROM DeteccionVehiculo d
-      LEFT JOIN ListaBlanca v ON v.id = d.vehiculo_autorizado_id
-      WHERE (d.cedula_ingreso = @cedula OR v.cedula = @cedula)
-        AND COALESCE(d.tipo_movimiento, 'ingreso') = 'ingreso'
-        AND d.fecha_hora_salida IS NULL
-      ORDER BY d.fecha_hora_ingreso DESC, d.id DESC
-      LIMIT 2`);
-    return r.recordset.map(fila => fila.id);
-  },
-
   async personaPorCedula(cedula) {
     // Orden: permiso vigente, último ingreso con esa cédula, última solicitud, permiso anterior y, al
     // final, el catastro público del RUC (solo nombre; ver infraestructura/herramientas/importarCatastroRuc.ts).
@@ -663,17 +650,6 @@ export const repositorioDeteccionesSql: RepositorioDetecciones = {
       ORDER BY prioridad, fecha DESC NULLS LAST, orden DESC
       LIMIT 1`);
     return r.recordset[0] ?? null;
-  },
-
-  async permisosActivosPorCedula(cedula) {
-    const r = await db().request().input('cedula', sql.VarChar(10), cedula).query(`
-      SELECT id, cedula, propietario, placa, tipo_vehiculo, marca, modelo, color, motivo_ingreso,
-             institucion, cargo, departamento, categoria, fecha_inicio, fecha_vencimiento, horario
-      FROM ListaBlanca
-      WHERE activo = TRUE AND cedula = @cedula
-      ORDER BY id DESC
-      LIMIT 2`);
-    return r.recordset;
   },
 
   async registrarSalida(id, permitirFichaIncompleta = false) {

@@ -127,7 +127,10 @@ export const CampoPlaca: React.FC<Comunes & { valor: string; onCambiar: (placa: 
   // y el campo muestra lo mismo que se va a validar
   useEffect(() => {
     if (valor !== placa) onCambiar(placa);
-    if (normalizarPlaca(texto).slice(0, LARGO_PLACA) !== placa) setTexto(formatearPlacaParcial(placa));
+    if (normalizarPlaca(texto).slice(0, LARGO_PLACA) !== placa) {
+      setTexto(formatearPlacaParcial(placa));
+      if (!placa) setTocado(false);
+    }
   }, [valor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Normaliza lo escrito; el guion aparece o desaparece y el cursor sigue tras el mismo carácter. */

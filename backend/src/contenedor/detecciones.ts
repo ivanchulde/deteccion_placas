@@ -9,7 +9,7 @@ import { eliminarEvidencia } from '../infraestructura/servicios/media';
 import { evidenciaRecienteAnpr, guardarCuadroAnpr, historialAnpr } from '../infraestructura/servicios/servicioAnpr';
 import { resolverPorDeteccion } from '../infraestructura/servicios/notificaciones';
 import { findBlacklistMatch, findPermisoExacto } from '../infraestructura/servicios/plateMatching';
-import { ZONA_HORARIA } from '../infraestructura/servicios/tiempo';
+import { inicioDiaLocal, ZONA_HORARIA } from '../infraestructura/servicios/tiempo';
 import { conCachePorClave } from '../infraestructura/servicios/cacheBreve';
 import { compararVehiculo } from '../dominio/vehiculoAtributos';
 import { pdfHistorial, pdfRegistros } from '../infraestructura/servicios/documentosRegistros';
@@ -81,5 +81,5 @@ export const detecciones = casosDetecciones({
   ...(sriAutomatico ? { vehiculoSri: { consultar: (placa: string) => vehiculoPublico.porPlaca(placa) } } : {}),
   eventos: eventosSocket,
   auditoria: auditoriaSql,
-  tiempo: { ahora: () => new Date(), zona: ZONA_HORARIA },
+  tiempo: { ahora: () => new Date(), inicioDiaLocal, zona: ZONA_HORARIA },
 });

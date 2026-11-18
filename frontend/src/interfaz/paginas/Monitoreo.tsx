@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AvisoFlotante } from '../componentes/AvisoFlotante';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Bell, BellOff, Camera, ClipboardPlus, Cpu, Edit3, Film, Gauge, History, LogOut, Pause, Play, Plus, ShieldAlert, ShieldCheck, Trash2, X } from 'lucide-react';
+import { Bell, BellOff, Camera, ClipboardPlus, Cpu, Edit3, Film, Gauge, History, Loader2, LogOut, Pause, Play, Plus, Search, ShieldAlert, ShieldCheck, Trash2, X } from 'lucide-react';
 import api, { mensajeError } from '../../infraestructura/api';
 import { useAuth } from '../../aplicacion/AuthContext';
 import { useEvento, useReconexion } from '../../aplicacion/tiempoReal';
-import { useConsulta, usePaginaVisible } from '../../aplicacion/hooks';
+import { useConsulta, useFechaLocal, usePaginaVisible } from '../../aplicacion/hooks';
 import type { Camara, Deteccion, EstadoAnpr } from '../../dominio/tipos';
-import { codecVideo, ESTADOS, fecha, fechaHora, fechaIsoLocal, hora, limiteDia, numero, relativo } from '../../dominio/formato';
-import { formatearPlaca } from '../../dominio/validacion';
+import { codecVideo, ESTADOS, fecha, fechaHora, hora, limiteDia, numero, relativo } from '../../dominio/formato';
+import { formatearPlaca, validarPlaca } from '../../dominio/validacion';
 import { ESTADOS_ACCESO, esRegistroDeSalidas, estadoAcceso, faltantesSalida, puedeRegistrarSalida } from '../../dominio/estadoAcceso';
 import { Cargando, InsigniaEstado, InsigniaTipificacion, Paginacion, Placa, Segmentado, Tarjeta, Vacio } from '../componentes/ui';
 import { ImagenEvidencia, PlacaFoto, RegistroManualModal, TarjetaDeteccion, ValidarModal } from '../componentes/deteccion';
@@ -453,7 +453,10 @@ export const TablaIngresosRecientes: React.FC<{
 }> = ({ salidaManual = true, items, onValidar, onEliminar, refConsulta, onRegistrar = () => undefined, puedeEditarCampos, seleccionada, onSeleccionar, registrandoSalida, onRegistrarSalida }) => {
   const [params, setParams] = useSearchParams();
   const [zoom, setZoom] = useState<Deteccion | null>(null);
+  const idBusqueda = React.useId();
   const [texto, setTexto] = useState('');
+  const placaBuscada = validarPlaca(texto);
+  const placaCompleta = placaBuscada.ok ? placaBuscada.valor.placa : '';
   const [resultado, setResultado] = useState<ResultadoBusqueda | null>(null);
   const [pagina, setPagina] = useState(1);
   const [ediciones, setEdiciones] = useState<Record<number, Deteccion>>({});
@@ -464,15 +467,18 @@ export const TablaIngresosRecientes: React.FC<{
   const terminoAplicado = useRef('');
   const estadoFiltro = params.get('estado') ?? '';
   const soloDentro = estadoFiltro === 'dentro';
+  const dia = useFechaLocal();
   const soloHoy = params.get('hoy') === '1';
+  const entradasHoy = !estadoFiltro && !params.has('validado') && params.get('vista') !== 'pendientes';
   const listado = useConsulta<{ items: Deteccion[]; total: number; pagina: number; tamano: number }>(
     // La salida que cerró un ingreso aparece en la fila de ese ingreso (hora de salida), no como otra fila
-    () => api.get('/detecciones', { params: { pagina, tamano: 30, unir_salidas: 'si', completos: 'no', buscar: busquedaAplicada || undefined,
+    () => api.get('/detecciones', { params: { pagina, tamano: 30, buscar: busquedaAplicada || undefined,
+      ...(entradasHoy ? { entradas_hoy: 'si' } : { unir_salidas: 'si', completos: 'no' }),
       ...(estadoFiltro && !soloDentro ? { estado: estadoFiltro } : {}),
       ...(soloDentro ? { estado: 'autorizado', cerrados: 'no' } : {}),
       ...(params.get('validado') ? { validado: params.get('validado') } : {}),
-      ...(soloHoy ? { desde: limiteDia(fechaIsoLocal()), hasta: limiteDia(fechaIsoLocal(), true) } : {}) } }).then(r => r.data),
-    [pagina, busquedaAplicada, estadoFiltro, soloDentro, soloHoy, params]);
+      ...(soloHoy && !entradasHoy ? { desde: limiteDia(dia), hasta: limiteDia(dia, true) } : {}) } }).then(r => r.data),
+    [pagina, busquedaAplicada, estadoFiltro, soloDentro, soloHoy, entradasHoy, dia, params]);
   useEffect(() => { void listado.recargar(true); }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (listado.datos && pagina > 1 && !listado.datos.items.length) setPagina(pagina - 1); }, [listado.datos, pagina]);
   // Una fila trasladada a Salidas deja de necesitar sus ediciones locales. Si se reabre más tarde,
@@ -488,7 +494,7 @@ export const TablaIngresosRecientes: React.FC<{
   }, [listado.datos]);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    const termino = texto.trim();
+    const termino = placaCompleta || texto.trim();
     const id = ++consultaBusqueda.current;
     const temporizador = window.setTimeout(async () => {
       if (terminoAplicado.current !== termino) {
@@ -497,20 +503,14 @@ export const TablaIngresosRecientes: React.FC<{
       }
       setBusquedaAplicada(termino);
       setError(null);
-      if (termino.length < 2) {
-        setResultado(null);
-        setConsultando(false);
-        return;
-      }
-      const esPlaca = /^[A-Za-z0-9-]{3,10}$/.test(termino);
-      if (!esPlaca) {
+      if (!placaCompleta) {
         setResultado(null);
         setConsultando(false);
         return;
       }
       setConsultando(true);
       try {
-        const respuesta = await api.get(`/detecciones/buscar-placa/${encodeURIComponent(termino)}`);
+        const respuesta = await api.get(`/detecciones/buscar-placa/${encodeURIComponent(placaCompleta)}`);
         if (consultaBusqueda.current === id) setResultado(respuesta.data);
       } catch (err) {
         if (consultaBusqueda.current === id) {
@@ -522,11 +522,13 @@ export const TablaIngresosRecientes: React.FC<{
       }
     }, 250);
     return () => window.clearTimeout(temporizador);
-  }, [texto]);
+  }, [texto, placaCompleta]);
   const limpiar = () => { setTexto(''); setResultado(null); setPagina(1); setBusquedaAplicada(''); setError(null); };
   const cambiarFiltro = (valor: string) => {
     const siguiente = new URLSearchParams(params);
-    if (valor && valor !== 'todos') siguiente.set('estado', valor);
+    if (valor === 'todos') siguiente.set('vista', 'pendientes');
+    else siguiente.delete('vista');
+    if (valor !== 'hoy' && valor !== 'todos') siguiente.set('estado', valor);
     else siguiente.delete('estado');
     if (valor === 'alerta') siguiente.set('hoy', '1');
     else siguiente.delete('hoy');
@@ -554,27 +556,39 @@ export const TablaIngresosRecientes: React.FC<{
     void listado.recargar(true);
   };
   // El resultado vale mientras el texto sea el consultado
-  const vigente = resultado && resultado.placa.replace(/-/g, '') === texto.trim().toUpperCase().replace(/-/g, '') ? resultado : null;
-  const filas = (listado.datos?.items ?? []).map(d => ediciones[d.id] ?? d).filter(d => !esRegistroDeSalidas(d));
+  const vigente = resultado?.placa === placaCompleta ? resultado : null;
+  const filas = (listado.datos?.items ?? []).map(d => ediciones[d.id] ?? d).filter(d => entradasHoy || !esRegistroDeSalidas(d));
   return (
-    <Tarjeta titulo="Todos los registros"
-      subtitulo={`${listado.datos?.total ?? 0} registros${soloDentro ? ' autorizados sin salida · mismo criterio del dashboard' : soloHoy ? ' alertas de hoy' : ' sin salida o con datos pendientes · los completos con salida están en Registro de Salidas'}`}
+    <Tarjeta className="registros-ingresos" titulo={entradasHoy ? 'Entradas de hoy' : 'Registros pendientes'}
+      subtitulo={listado.datos && `${numero(listado.datos.total)} ${listado.datos.total === 1 ? 'registro' : 'registros'} · ${entradasHoy ? 'Ingresos de hoy, con o sin salida' : soloHoy ? 'Alertas de hoy' : 'Todas las fechas'}`}
       sinPadding acciones={
-      <form className="fila" role="search" onSubmit={e => e.preventDefault()} style={{ gap: 6 }}>
-        <select className="input" aria-label="Filtrar accesos" style={{ width: 230 }} value={soloDentro ? 'dentro' : estadoFiltro || 'todos'} onChange={e => cambiarFiltro(e.target.value)}>
-          <option value="todos">Todos los registros</option>
-          <option value="autorizado">Autorizados</option>
-          <option value="pendiente_revision">Por autorizar</option>
-          <option value="no_reconocido">No registrados</option>
-          <option value="alerta">Alertas hoy</option>
-          <option value="dentro">Autorizados sin salida</option>
-        </select>
-        <input ref={refConsulta} className="input" style={{ height: 32, width: 220 }} value={texto} maxLength={100} placeholder="Placa, vehículo o titular"
-          {...enMayusculas(setTexto)}
-          aria-label="Buscar por placa, vehículo o titular" autoComplete="off" spellCheck={false} />
-        {consultando && <span className="texto-secundario" role="status">Buscando…</span>}
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onRegistrar}><ClipboardPlus size={14} /> Registrar</button>
-        {texto && <button type="button" className="btn btn-ghost btn-sm btn-icono" title="Quitar el filtro" aria-label="Quitar el filtro" onClick={limpiar}><X size={14} /></button>}
+      <form className="registros-herramientas" role="search" aria-label="Buscar en los registros de ingreso" onSubmit={e => e.preventDefault()}>
+        <div className="registros-campo registros-busqueda">
+          <label htmlFor={idBusqueda}>Buscar por placa</label>
+          <div className="registros-caja-busqueda">
+            <span className="registros-lupa">
+              {consultando
+                ? <Loader2 size={17} className="girar" role="status" aria-label="Consultando placa" />
+                : <Search size={17} aria-hidden="true" />}
+            </span>
+            <input id={idBusqueda} ref={refConsulta} type="search" value={texto} maxLength={100} placeholder="Ej. ABC-1234, marca o titular"
+              {...enMayusculas(setTexto)} autoComplete="off" spellCheck={false} />
+            {texto && <button type="button" className="registros-borrar" aria-label="Borrar la búsqueda" title="Borrar la búsqueda"
+              onClick={() => { limpiar(); document.getElementById(idBusqueda)?.focus(); }}><X size={16} aria-hidden="true" /></button>}
+          </div>
+        </div>
+        <label className="registros-campo">Mostrar
+          <select className="select" aria-label="Filtrar accesos" value={entradasHoy ? 'hoy' : estadoFiltro || 'todos'} onChange={e => cambiarFiltro(e.target.value)}>
+            <option value="hoy">Entradas de hoy</option>
+            <option value="todos">Todos los pendientes</option>
+            <option value="autorizado">Autorizados</option>
+            <option value="pendiente_revision">Por autorizar</option>
+            <option value="no_reconocido">No registrados</option>
+            <option value="alerta">Alertas hoy</option>
+            <option value="dentro">Autorizados sin salida</option>
+          </select>
+        </label>
+        <button type="button" className="btn btn-secondary" onClick={onRegistrar}><ClipboardPlus size={16} aria-hidden="true" /> Registrar</button>
       </form>}>
       {(error || vigente) && <div style={{ padding: '12px 16px 0' }}>{error ? <AvisoFlotante tipo="error">{error}</AvisoFlotante> : vigente && <SituacionPlaca r={vigente} />}</div>}
       {listado.error && <AvisoFlotante tipo="error">{listado.error}</AvisoFlotante>}

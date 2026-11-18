@@ -1311,6 +1311,40 @@ a.kpi:hover, button.kpi:hover { border-color: var(--kpi-color, var(--border-stro
   .informe-detalle > summary { display: none; }
 }
 
+/* Buscador del registro de ingresos */
+.registros-ingresos { container: ingresos / inline-size; }
+.registros-ingresos .tarjeta-cabecera > .acciones { min-width: 0; max-width: 100%; }
+.registros-herramientas {
+  display: grid; grid-template-columns: minmax(220px, 290px) auto auto;
+  align-items: end; gap: 10px; width: 100%;
+}
+.registros-campo { display: grid; gap: 5px; min-width: 0; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.registros-herramientas .select, .registros-herramientas > .btn { height: 40px; border-radius: var(--radius); font-size: 13px; }
+.registros-herramientas .select { padding-inline: 10px; font-weight: 400; }
+.registros-caja-busqueda {
+  display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 5px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface);
+}
+.registros-caja-busqueda:focus-within { border-color: var(--pendiente); outline: 2px solid var(--pendiente-border); }
+.registros-lupa, .registros-borrar { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border-radius: var(--radius-sm); }
+.registros-lupa { background: var(--pendiente-bg); color: var(--pendiente); }
+.registros-caja-busqueda input {
+  flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none;
+  background: transparent; color: var(--text); font: inherit; font-size: 13px;
+}
+.registros-caja-busqueda input::placeholder { color: var(--text-3); font-weight: 400; }
+.registros-caja-busqueda input::-webkit-search-cancel-button { appearance: none; }
+.registros-borrar { border: 0; color: var(--text-3); background: transparent; cursor: pointer; }
+.registros-borrar:hover, .registros-borrar:focus-visible { background: var(--surface-3); color: var(--text); }
+@container ingresos (max-width: 720px) {
+  .registros-ingresos .tarjeta-cabecera > .acciones { width: 100%; }
+  .registros-herramientas { grid-template-columns: minmax(0, 1fr) auto auto; }
+}
+@container ingresos (max-width: 530px) {
+  .registros-herramientas { grid-template-columns: minmax(0, 1fr) auto; }
+  .registros-busqueda { grid-column: 1 / -1; }
+}
+
 /* ─── Historial completo: totales de la consulta, filtros y panel de la fila elegida ─── */
 .filtros-extra { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
 .filtros-activos { gap: 6px; margin-top: 12px; }

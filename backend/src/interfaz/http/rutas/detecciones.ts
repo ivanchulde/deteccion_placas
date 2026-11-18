@@ -24,7 +24,7 @@ import { actorDe, controlador, escribirRespuesta, idDe, limitarSimultaneas } fro
  *   POST /validar/:id          corrección / confirmación del personal (excepción con accesos:excepcion)
  *   POST /:id/salida            registra la hora de salida de un ingreso existente
  *   POST /salida-placa           busca por placa el ingreso abierto más reciente y registra la salida
- *   POST /movimiento-placa       recibe placa o cédula y registra entrada/salida según el movimiento abierto
+ *   POST /movimiento-placa       recibe la placa y registra entrada/salida según el movimiento abierto
  *   PATCH /:id/ingreso         cédula, titular, motivo y atributos del vehículo del ingreso
  *   PATCH /:id/registro        corrección administrativa del historial, con motivo auditado
  *   GET /registro-manual/cuadros  miniaturas de los últimos 30 s de la cámara (foto del registro manual)
